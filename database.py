@@ -1,22 +1,13 @@
-import os
+import sqlite3
 from contextlib import contextmanager
-import pymysql
-import pymysql.cursors
 
-DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
-    "port":     int(os.getenv("DB_PORT", "3306")),
-    "user":     os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", ""),
-    "database": os.getenv("DB_NAME", "task_manager"),
-    "charset":  "utf8mb4",
-    "cursorclass": pymysql.cursors.DictCursor,
-}
+DB_PATH = "tasks.db"
 
 
 @contextmanager
 def get_connection():
-    conn = pymysql.connect(**DB_CONFIG)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     try:
         yield conn
         conn.commit()
@@ -29,13 +20,12 @@ def get_connection():
 
 def init_db():
     with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id          INT AUTO_INCREMENT PRIMARY KEY,
-                    title       VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    status      ENUM('pending','in_progress','done') NOT NULL DEFAULT 'pending',
-                    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                title       TEXT    NOT NULL,
+                description TEXT    DEFAULT '',
+                status      TEXT    NOT NULL DEFAULT 'pending',
+                created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)

@@ -4,7 +4,7 @@ from tasks import create_task, list_tasks, update_task, delete_task
 
 def main():
     init_db()
-    print("=== Gerenciador de Tarefas (MySQL) ===\n")
+    print("=== Gerenciador de Tarefas (SQLite) ===\n")
 
     t1 = create_task("Estudar Python", "Revisar conceitos de OOP")
     t2 = create_task("Criar API REST", "Usar FastAPI com MySQL")
