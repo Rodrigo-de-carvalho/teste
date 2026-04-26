@@ -111,3 +111,27 @@ def init_db():
             """)
             if cur.fetchone()["cnt"] == 0:
                 cur.execute("ALTER TABLE tasks ADD COLUMN start_time TIME AFTER deadline")
+
+            # Tabela para persistir configurações do app (ex: secret_key).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS app_config (
+                    key_name VARCHAR(80)  PRIMARY KEY,
+                    value    VARCHAR(255) NOT NULL
+                )
+            """)
+
+
+def get_or_create_secret_key() -> str:
+    import secrets
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM app_config WHERE key_name = 'secret_key'")
+            row = cur.fetchone()
+            if row:
+                return row["value"]
+            key = secrets.token_hex(32)
+            cur.execute(
+                "INSERT INTO app_config (key_name, value) VALUES ('secret_key', %s)",
+                (key,),
+            )
+            return key

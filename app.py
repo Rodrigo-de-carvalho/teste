@@ -2,7 +2,7 @@ import os
 import functools
 from datetime import date
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from database import init_db
+from database import init_db, get_or_create_secret_key
 from auth import create_user, authenticate, get_user
 from tasks import (
     create_task, get_task, list_tasks, update_task, delete_task,
@@ -10,9 +10,8 @@ from tasks import (
 )
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
-
 init_db()
+app.secret_key = os.environ.get("SECRET_KEY") or get_or_create_secret_key()
 
 
 def format_time(minutes):
