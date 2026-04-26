@@ -6,6 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# DEBUG — lista todas as variáveis de ambiente relacionadas a MySQL
+print("=== DEBUG MYSQL ENV VARS ===")
+for key, val in os.environ.items():
+    if "MYSQL" in key.upper() or "DATABASE" in key.upper():
+        masked = val[:4] + "***" if key.upper().endswith("PASSWORD") and val else val
+        print(f"  {key} = {masked}")
+print("============================")
+
 
 def _get_config():
     # Railway injects MYSQLHOST/MYSQLUSER/... (no underscore separator).
