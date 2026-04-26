@@ -52,11 +52,38 @@ def init_db():
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id         INT AUTO_INCREMENT PRIMARY KEY,
+                    username   VARCHAR(80)  NOT NULL UNIQUE,
+                    password   VARCHAR(255) NOT NULL,
+                    created_at DATETIME     DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS categories (
+                    id      INT AUTO_INCREMENT PRIMARY KEY,
+                    name    VARCHAR(80) NOT NULL,
+                    color   VARCHAR(7)  NOT NULL DEFAULT '#6366f1',
+                    user_id INT         NOT NULL,
+                    CONSTRAINT fk_cat_user FOREIGN KEY (user_id)
+                        REFERENCES users(id) ON DELETE CASCADE
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS tasks (
-                    id          INT AUTO_INCREMENT PRIMARY KEY,
-                    title       VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    status      VARCHAR(50)  NOT NULL DEFAULT 'pending',
-                    created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP
+                    id             INT AUTO_INCREMENT PRIMARY KEY,
+                    title          VARCHAR(255) NOT NULL,
+                    description    TEXT,
+                    status         VARCHAR(50)  NOT NULL DEFAULT 'pending',
+                    priority       VARCHAR(20)  NOT NULL DEFAULT 'medium',
+                    deadline       DATE,
+                    estimated_time INT,
+                    category_id    INT,
+                    user_id        INT          NOT NULL,
+                    created_at     DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT fk_task_cat  FOREIGN KEY (category_id)
+                        REFERENCES categories(id) ON DELETE SET NULL,
+                    CONSTRAINT fk_task_user FOREIGN KEY (user_id)
+                        REFERENCES users(id) ON DELETE CASCADE
                 )
             """)
