@@ -742,8 +742,8 @@
           {% if task.dl_label %}
           <span class="badge-deadline {{ task.dl_class }}">📅 {{ task.dl_label }}</span>
           {% endif %}
-          {% if task.start_time %}
-          <span class="badge-time">🕐 {{ task.start_time.strftime('%H:%M') if task.start_time else '' }}{% if task.estimated_time %} · {{ task.estimated_time | format_time }}{% endif %}</span>
+          {% if task.start_time_str %}
+          <span class="badge-time">🕐 {{ task.start_time_str }}{% if task.estimated_time %} · {{ task.estimated_time | format_time }}{% endif %}</span>
           {% elif task.estimated_time %}
           <span class="badge-time">⏱ {{ task.estimated_time | format_time }}</span>
           {% endif %}
@@ -801,7 +801,7 @@
                 </div>
                 <div class="form-group">
                   <label>Horário de início</label>
-                  <input type="time" name="start_time" value="{{ task.start_time.strftime('%H:%M') if task.start_time else '' }}" />
+                  <input type="time" name="start_time" value="{{ task.start_time_str or '' }}" />
                 </div>
                 <div class="form-group">
                   <label>Duração (min)</label>

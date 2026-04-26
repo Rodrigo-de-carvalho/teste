@@ -38,29 +38,42 @@ def login_required(f):
     return decorated
 
 
-def _deadline_info(task, today):
+def _process_task(task, today):
+    # Deadline badge
     dl = task.get("deadline")
-    if not dl:
-        return task
-    if isinstance(dl, str):
-        from datetime import datetime
-        dl = datetime.strptime(dl, "%Y-%m-%d").date()
-    delta = (dl - today).days
-    if task.get("status") == "done":
-        task["dl_class"] = "ok"
-        task["dl_label"] = f"{dl.strftime('%d/%m/%Y')}"
-    elif delta < 0:
-        task["dl_class"] = "overdue"
-        task["dl_label"] = f"Atrasado {abs(delta)}d"
-    elif delta == 0:
-        task["dl_class"] = "today"
-        task["dl_label"] = "Hoje!"
-    elif delta <= 3:
-        task["dl_class"] = "soon"
-        task["dl_label"] = f"{delta}d"
+    if dl:
+        if isinstance(dl, str):
+            from datetime import datetime
+            dl = datetime.strptime(dl, "%Y-%m-%d").date()
+        delta = (dl - today).days
+        if task.get("status") == "done":
+            task["dl_class"] = "ok"
+            task["dl_label"] = dl.strftime("%d/%m/%Y")
+        elif delta < 0:
+            task["dl_class"] = "overdue"
+            task["dl_label"] = f"Atrasado {abs(delta)}d"
+        elif delta == 0:
+            task["dl_class"] = "today"
+            task["dl_label"] = "Hoje!"
+        elif delta <= 3:
+            task["dl_class"] = "soon"
+            task["dl_label"] = f"{delta}d"
+        else:
+            task["dl_class"] = "ok"
+            task["dl_label"] = f"{delta}d"
+
+    # start_time: PyMySQL retorna TIME como timedelta, converte para "HH:MM"
+    st = task.get("start_time")
+    if st is not None:
+        import datetime as dt
+        if isinstance(st, dt.timedelta):
+            total = int(st.total_seconds())
+            task["start_time_str"] = f"{total // 3600:02d}:{(total % 3600) // 60:02d}"
+        else:
+            task["start_time_str"] = st.strftime("%H:%M")
     else:
-        task["dl_class"] = "ok"
-        task["dl_label"] = f"{delta}d"
+        task["start_time_str"] = None
+
     return task
 
 
@@ -123,7 +136,7 @@ def index():
 
     today = date.today()
     tasks = list_tasks(user_id, status=status_filter, priority=priority_filter, category_id=category_filter_int)
-    tasks = [_deadline_info(t, today) for t in tasks]
+    tasks = [_process_task(t, today) for t in tasks]
 
     categories = list_categories(user_id)
     stats = get_stats(user_id)

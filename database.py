@@ -11,7 +11,6 @@ load_dotenv()
 def _get_config():
     url = os.environ.get("DATABASE_URL") or os.environ.get("MYSQL_URL")
     if url:
-        # Railway provides mysql://user:pass@host:port/db
         parsed = urllib.parse.urlparse(url)
         return {
             "host": parsed.hostname,
@@ -22,8 +21,6 @@ def _get_config():
             "cursorclass": pymysql.cursors.DictCursor,
             "autocommit": False,
         }
-
-    # Fallback: variáveis individuais (Railway sem underscore ou local com underscore)
     return {
         "host": os.environ.get("MYSQLHOST") or os.environ.get("MYSQL_HOST", "localhost"),
         "port": int(os.environ.get("MYSQLPORT") or os.environ.get("MYSQL_PORT", 3306)),
@@ -48,9 +45,20 @@ def get_connection():
         conn.close()
 
 
+def _col_exists(cur, table, column):
+    cur.execute("SHOW COLUMNS FROM `%s` LIKE %%s" % table, (column,))
+    return cur.fetchone() is not None
+
+
+def _table_exists(cur, table):
+    cur.execute("SHOW TABLES LIKE %s", (table,))
+    return cur.fetchone() is not None
+
+
 def init_db():
     with get_connection() as conn:
         with conn.cursor() as cur:
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id         INT AUTO_INCREMENT PRIMARY KEY,
@@ -59,6 +67,7 @@ def init_db():
                     created_at DATETIME     DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS categories (
                     id      INT AUTO_INCREMENT PRIMARY KEY,
@@ -70,16 +79,18 @@ def init_db():
                 )
             """)
 
-            # Se a tabela tasks existir com o schema antigo (sem user_id), recria.
             cur.execute("""
-                SELECT COUNT(*) AS cnt
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME   = 'tasks'
-                  AND COLUMN_NAME  = 'user_id'
+                CREATE TABLE IF NOT EXISTS app_config (
+                    key_name VARCHAR(80)  PRIMARY KEY,
+                    value    VARCHAR(255) NOT NULL
+                )
             """)
-            if cur.fetchone()["cnt"] == 0:
-                cur.execute("DROP TABLE IF EXISTS tasks")
+
+            # Se tasks existe sem user_id (schema antigo), dropa e recria.
+            if _table_exists(cur, "tasks") and not _col_exists(cur, "tasks", "user_id"):
+                cur.execute("SET FOREIGN_KEY_CHECKS = 0")
+                cur.execute("DROP TABLE tasks")
+                cur.execute("SET FOREIGN_KEY_CHECKS = 1")
 
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS tasks (
@@ -101,20 +112,11 @@ def init_db():
                 )
             """)
 
-            # Adiciona start_time se a tabela já existia sem essa coluna.
-            try:
-                cur.execute("ALTER TABLE tasks ADD COLUMN start_time TIME AFTER deadline")
-            except Exception as e:
-                if "Duplicate column" not in str(e):
-                    raise
-
-            # Tabela para persistir configurações do app (ex: secret_key).
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS app_config (
-                    key_name VARCHAR(80)  PRIMARY KEY,
-                    value    VARCHAR(255) NOT NULL
+            # Adiciona start_time se a coluna não existir ainda.
+            if not _col_exists(cur, "tasks", "start_time"):
+                cur.execute(
+                    "ALTER TABLE tasks ADD COLUMN start_time TIME AFTER deadline"
                 )
-            """)
 
 
 def get_or_create_secret_key() -> str:
@@ -122,7 +124,9 @@ def get_or_create_secret_key() -> str:
     key = None
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT value FROM app_config WHERE key_name = 'secret_key'")
+            cur.execute(
+                "SELECT value FROM app_config WHERE key_name = 'secret_key'"
+            )
             row = cur.fetchone()
             if row:
                 key = row["value"]
