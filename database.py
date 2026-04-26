@@ -69,6 +69,18 @@ def init_db():
                         REFERENCES users(id) ON DELETE CASCADE
                 )
             """)
+
+            # Se a tabela tasks existir com o schema antigo (sem user_id), recria.
+            cur.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME   = 'tasks'
+                  AND COLUMN_NAME  = 'user_id'
+            """)
+            if cur.fetchone()["cnt"] == 0:
+                cur.execute("DROP TABLE IF EXISTS tasks")
+
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS tasks (
                     id             INT AUTO_INCREMENT PRIMARY KEY,
