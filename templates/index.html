@@ -2,248 +2,909 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gerenciador de Tarefas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tarefas</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f0f2f5;
-      color: #1a1a2e;
-      min-height: 100vh;
+    :root {
+      --bg:           #f1f5f9;
+      --card:         #ffffff;
+      --primary:      #4f46e5;
+      --primary-dark: #4338ca;
+      --text:         #1e293b;
+      --text-muted:   #64748b;
+      --border:       #e2e8f0;
+      --radius:       12px;
+      --radius-sm:    8px;
+      --shadow:       0 1px 4px rgba(0,0,0,.07);
+      --shadow-md:    0 4px 16px rgba(0,0,0,.1);
     }
 
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 0.9375rem;
+    }
+
+    /* ── Header ── */
     header {
-      background: #4f46e5;
-      color: white;
-      padding: 1.5rem 2rem;
+      background: var(--primary);
+      color: #fff;
+      padding: 0.875rem 1.5rem;
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(79,70,229,.35);
+      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
     }
-    header h1 { font-size: 1.5rem; font-weight: 700; }
-    header span { font-size: 1.6rem; }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 1.15rem;
+      font-weight: 800;
+      flex: 1;
+      letter-spacing: -.01em;
+    }
+    .header-brand .icon {
+      background: rgba(255,255,255,.22);
+      border-radius: 9px;
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.05rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.15);
+    }
+    .header-user {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.875rem;
+    }
+    .header-username {
+      opacity: .9;
+      font-weight: 500;
+      background: rgba(255,255,255,.15);
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 6px;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,.28); }
 
-    main { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+    /* ── Layout ── */
+    main { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem 3rem; }
 
-    /* Card nova tarefa */
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    /* ── Stats ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem;
       margin-bottom: 1.5rem;
     }
-    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: #4f46e5; }
-
-    .form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-    .form-row input, .form-row textarea {
-      flex: 1;
-      padding: 0.6rem 0.9rem;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      outline: none;
-      transition: border-color .2s;
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+      border-top: 3px solid currentColor;
+      transition: transform .15s, box-shadow .15s;
     }
-    .form-row input:focus, .form-row textarea:focus { border-color: #4f46e5; }
-    textarea { resize: none; height: 42px; min-width: 200px; }
-
-    button.btn-add {
-      background: #4f46e5;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 0.6rem 1.4rem;
-      font-size: 0.95rem;
-      cursor: pointer;
+    .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .stat-card .stat-icon { font-size: 1.25rem; margin-bottom: 0.35rem; display: block; }
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -.02em;
+    }
+    .stat-card .stat-label {
+      font-size: 0.72rem;
       font-weight: 600;
-      transition: background .2s;
-      white-space: nowrap;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
     }
-    button.btn-add:hover { background: #4338ca; }
+    .stat-total      { color: var(--primary); }
+    .stat-pending    { color: #f59e0b; }
+    .stat-progress   { color: #3b82f6; }
+    .stat-done       { color: #10b981; }
+    .stat-overdue    { color: #ef4444; }
 
-    /* Filtros */
-    .filters {
+    /* ── New task button ── */
+    .top-bar {
       display: flex;
-      gap: 0.5rem;
+      align-items: center;
+      gap: 0.75rem;
       margin-bottom: 1rem;
       flex-wrap: wrap;
     }
-    .filters a {
-      text-decoration: none;
-      padding: 0.4rem 1rem;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      border: 1.5px solid #d1d5db;
-      color: #6b7280;
-      transition: all .2s;
-    }
-    .filters a:hover { border-color: #4f46e5; color: #4f46e5; }
-    .filters a.active { background: #4f46e5; color: white; border-color: #4f46e5; }
-
-    /* Lista de tarefas */
-    .task-list { display: flex; flex-direction: column; gap: 0.75rem; }
-
-    .task {
-      background: white;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    .btn-new-task {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 1.2rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
       display: flex;
       align-items: center;
-      gap: 1rem;
-      transition: box-shadow .2s;
+      gap: 0.4rem;
     }
-    .task:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); }
+    .btn-new-task:hover { background: var(--primary-dark); }
+    .btn-new-task.cancel { background: #64748b; }
+    .btn-new-task.cancel:hover { background: #475569; }
 
-    .task-info { flex: 1; min-width: 0; }
-    .task-title {
+    /* ── Form panel ── */
+    .form-panel {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.25rem;
+      display: none;
+      border: 1.5px solid #e0e7ff;
+    }
+    .form-panel h2 {
+      font-size: 0.95rem;
       font-weight: 600;
-      font-size: 0.97rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      color: var(--primary);
+      margin-bottom: 1rem;
     }
-    .task-desc {
-      font-size: 0.82rem;
-      color: #6b7280;
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
     }
-    .task-date {
+    .form-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .form-group label {
       font-size: 0.75rem;
-      color: #9ca3af;
-      margin-top: 3px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
     }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 0.55rem 0.8rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79,70,229,.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 64px; }
+    .form-group-full { grid-column: 1 / -1; }
 
-    .badge {
+    .btn-submit {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 1.4rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.25rem;
+      transition: background .2s;
+    }
+    .btn-submit:hover { background: var(--primary-dark); }
+
+    /* ── Filters ── */
+    .filters-bar {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 0.875rem 1rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .filter-label {
       font-size: 0.75rem;
       font-weight: 600;
-      padding: 0.25rem 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+    .filter-pill {
+      text-decoration: none;
+      padding: 0.3rem 0.75rem;
       border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border: 1.5px solid var(--border);
+      color: var(--text-muted);
+      transition: all .15s;
       white-space: nowrap;
     }
-    .badge-pending    { background: #fef3c7; color: #92400e; }
-    .badge-in_progress { background: #dbeafe; color: #1e40af; }
-    .badge-done       { background: #d1fae5; color: #065f46; }
+    .filter-pill:hover { border-color: var(--primary); color: var(--primary); }
+    .filter-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .filter-pill.active-high   { background: #ef4444; color: #fff; border-color: #ef4444; }
+    .filter-pill.active-medium { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .filter-pill.active-low    { background: #10b981; color: #fff; border-color: #10b981; }
+    .filter-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 
-    .task-actions { display: flex; gap: 0.4rem; align-items: center; }
-
-    select.status-select {
-      padding: 0.3rem 0.5rem;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 0.82rem;
+    select.filter-select {
+      padding: 0.3rem 0.6rem;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color: var(--text-muted);
+      background: #fff;
       cursor: pointer;
       outline: none;
     }
-    button.btn-save {
-      background: #10b981;
-      color: white;
+    select.filter-select:focus { border-color: var(--primary); }
+
+    /* ── Task list ── */
+    .task-list { display: flex; flex-direction: column; gap: 0.625rem; }
+
+    .task-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border-left: 4px solid #cbd5e1;
+      overflow: hidden;
+      transition: box-shadow .2s;
+    }
+    .task-card:hover { box-shadow: var(--shadow-md); }
+    .task-card.priority-high   { border-left-color: #ef4444; }
+    .task-card.priority-medium { border-left-color: #f59e0b; }
+    .task-card.priority-low    { border-left-color: #10b981; }
+
+    .task-body { padding: 0.875rem 1rem; }
+
+    .task-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.35rem;
+    }
+    .task-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+    .task-badges {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .task-desc {
+      font-size: 0.825rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
+    .task-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .badge-status-pending    { background: #fef3c7; color: #92400e; }
+    .badge-status-in_progress { background: #dbeafe; color: #1e40af; }
+    .badge-status-done       { background: #d1fae5; color: #065f46; }
+
+    .badge-priority-high   { background: #fef2f2; color: #b91c1c; }
+    .badge-priority-medium { background: #fffbeb; color: #92400e; }
+    .badge-priority-low    { background: #ecfdf5; color: #065f46; }
+
+    .badge-cat {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .badge-deadline { font-size: 0.75rem; font-weight: 500; }
+    .badge-deadline.overdue { color: #dc2626; }
+    .badge-deadline.today   { color: #d97706; font-weight: 700; }
+    .badge-deadline.soon    { color: #d97706; }
+    .badge-deadline.ok      { color: var(--text-muted); }
+
+    .badge-time { font-size: 0.75rem; color: var(--text-muted); }
+    .badge-created { font-size: 0.72rem; color: #94a3b8; }
+
+    /* ── Task actions ── */
+    .task-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border);
+      background: #fafbfc;
+      flex-wrap: wrap;
+    }
+
+    .action-form { display: flex; align-items: center; gap: 0.35rem; }
+
+    select.status-select {
+      padding: 0.3rem 0.5rem;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+      background: #fff;
+    }
+    select.status-select:focus { border-color: var(--primary); }
+
+    .btn-action {
       border: none;
       border-radius: 6px;
       padding: 0.3rem 0.7rem;
-      font-size: 0.82rem;
-      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
       font-weight: 600;
-    }
-    button.btn-save:hover { background: #059669; }
-    button.btn-del {
-      background: #fee2e2;
-      color: #dc2626;
-      border: none;
-      border-radius: 6px;
-      padding: 0.3rem 0.6rem;
-      font-size: 0.82rem;
       cursor: pointer;
-      font-weight: 700;
+      transition: background .15s;
+      white-space: nowrap;
     }
-    button.btn-del:hover { background: #fca5a5; }
+    .btn-save-status { background: #10b981; color: #fff; }
+    .btn-save-status:hover { background: #059669; }
+    .btn-del        { background: #fee2e2; color: #dc2626; }
+    .btn-del:hover  { background: #fecaca; }
+    .btn-del-confirm { background: #dc2626; color: #fff; }
+    .btn-del-confirm:hover { background: #b91c1c; }
+    .btn-cancel-del { background: #e2e8f0; color: var(--text); }
+    .btn-cancel-del:hover { background: #cbd5e1; }
 
-    .empty {
-      text-align: center;
-      padding: 3rem;
-      color: #9ca3af;
-      font-size: 0.95rem;
+    .del-wrap { display: flex; align-items: center; gap: 0.35rem; }
+    .del-confirm-group { display: none; align-items: center; gap: 0.3rem; }
+    .del-wrap.confirming .del-confirm-group { display: flex; }
+
+    /* ── Edit panel (details/summary) ── */
+    details.edit-panel { width: 100%; }
+    details.edit-panel > summary {
+      list-style: none;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--primary);
+      padding: 0.3rem 0.7rem;
+      border-radius: 6px;
+      border: 1.5px solid #e0e7ff;
+      background: #eef2ff;
+      white-space: nowrap;
+      user-select: none;
+      transition: background .15s;
     }
-    .empty span { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+    details.edit-panel > summary:hover { background: #e0e7ff; }
+    details.edit-panel > summary::-webkit-details-marker { display: none; }
+    details.edit-panel[open] > summary { background: #e0e7ff; }
+
+    .edit-form-inner {
+      margin-top: 0.75rem;
+      padding: 1rem;
+      background: #f8faff;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid #e0e7ff;
+    }
+    .edit-form-inner .form-grid-2,
+    .edit-form-inner .form-grid-3 { margin-bottom: 0.6rem; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 3.5rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty-state .empty-icon { font-size: 3rem; display: block; margin-bottom: 0.75rem; }
+    .empty-state p { font-size: 0.95rem; }
+
+    /* ── Categories section ── */
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+    .categories-section {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-top: 1.5rem;
+      overflow: hidden;
+    }
+    .cat-section-header {
+      padding: 0.875rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .cat-section-body { padding: 1rem; }
+
+    .cat-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .cat-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.75rem 0.3rem 0.5rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+    .cat-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .cat-del-btn {
+      background: none;
+      border: none;
+      color: rgba(0,0,0,.35);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0 0.1rem;
+      line-height: 1;
+      margin-left: 0.15rem;
+    }
+    .cat-del-btn:hover { color: #dc2626; }
+
+    .cat-add-form {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .cat-add-form .form-group { flex: 1; min-width: 140px; }
+    .cat-add-form input {
+      padding: 0.5rem 0.75rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+    }
+    .cat-add-form input:focus { border-color: var(--primary); }
+    .cat-add-form input[type="color"] {
+      padding: 0.2rem;
+      height: 38px;
+      width: 52px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .btn-add-cat {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-add-cat:hover { background: var(--primary-dark); }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      header { padding: 0.75rem 1rem; }
+      .header-brand { font-size: 1rem; }
+      .header-user span { display: none; }
+      main { margin-top: 1rem; }
+
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-card .stat-value { font-size: 1.5rem; }
+
+      .form-grid-2,
+      .form-grid-3 { grid-template-columns: 1fr; }
+
+      .task-top { flex-direction: column; gap: 0.4rem; }
+      .task-badges { align-self: flex-start; }
+
+      .task-actions {
+        gap: 0.35rem;
+      }
+      .action-form { flex: 1; }
+      select.status-select { flex: 1; min-width: 0; }
+
+      .btn-action,
+      select.status-select {
+        min-height: 44px;
+        font-size: 0.9rem;
+        padding: 0.5rem 0.75rem;
+      }
+
+      .edit-form-inner .form-grid-2,
+      .edit-form-inner .form-grid-3 { grid-template-columns: 1fr; }
+
+      .filter-divider { display: none; }
+      .filter-group { width: 100%; }
+    }
   </style>
 </head>
 <body>
 
+<!-- Header -->
 <header>
-  <span>✅</span>
-  <h1>Gerenciador de Tarefas</h1>
+  <div class="header-brand">
+    <div class="icon">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <polyline points="3,9 7,13 15,5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    Tarefas
+  </div>
+  <div class="header-user">
+    <span class="header-username">{{ username }}</span>
+    <a href="/logout" class="btn-logout">Sair</a>
+  </div>
 </header>
 
 <main>
 
-  <!-- Formulário nova tarefa -->
-  <div class="card">
-    <h2>+ Nova Tarefa</h2>
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card stat-total">
+      <span class="stat-icon">📋</span>
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card stat-pending">
+      <span class="stat-icon">⏳</span>
+      <div class="stat-value">{{ stats.pending }}</div>
+      <div class="stat-label">Pendentes</div>
+    </div>
+    <div class="stat-card stat-progress">
+      <span class="stat-icon">🔄</span>
+      <div class="stat-value">{{ stats.in_progress }}</div>
+      <div class="stat-label">Em andamento</div>
+    </div>
+    <div class="stat-card stat-done">
+      <span class="stat-icon">✅</span>
+      <div class="stat-value">{{ stats.done }}</div>
+      <div class="stat-label">Concluídas</div>
+    </div>
+    {% if stats.overdue > 0 %}
+    <div class="stat-card stat-overdue">
+      <span class="stat-icon">🚨</span>
+      <div class="stat-value">{{ stats.overdue }}</div>
+      <div class="stat-label">Atrasadas</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- New task button -->
+  <div class="top-bar">
+    <button id="create-btn" class="btn-new-task" onclick="toggleCreate()">+ Nova Tarefa</button>
+  </div>
+
+  <!-- Create form -->
+  <div id="create-panel" class="form-panel">
+    <h2>Nova Tarefa</h2>
     <form method="POST" action="/create">
-      <div class="form-row">
-        <input  type="text" name="title" placeholder="Título da tarefa" required />
-        <textarea name="description" placeholder="Descrição (opcional)"></textarea>
-        <button type="submit" class="btn-add">Adicionar</button>
+      <div class="form-grid-2">
+        <div class="form-group form-group-full" style="grid-column:1">
+          <label>Título *</label>
+          <input type="text" name="title" placeholder="O que precisa ser feito?" required />
+        </div>
+        <div class="form-group">
+          <label>Prioridade</label>
+          <select name="priority">
+            <option value="medium">Média</option>
+            <option value="high">Alta</option>
+            <option value="low">Baixa</option>
+          </select>
+        </div>
       </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Descrição</label>
+        <textarea name="description" placeholder="Detalhes opcionais..."></textarea>
+      </div>
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label>Categoria</label>
+          <select name="category_id">
+            <option value="">Sem categoria</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prazo</label>
+          <input type="date" name="deadline" />
+        </div>
+        <div class="form-group">
+          <label>Horário de início</label>
+          <input type="time" name="start_time" />
+        </div>
+        <div class="form-group">
+          <label>Duração estimada (min)</label>
+          <input type="number" name="estimated_time" min="1" placeholder="ex: 90" />
+        </div>
+      </div>
+      <button type="submit" class="btn-submit">Criar Tarefa</button>
     </form>
   </div>
 
-  <!-- Filtros -->
-  <div class="filters">
-    <a href="/" class="{{ 'active' if not status_filter }}">Todas</a>
-    <a href="/?status=pending"     class="{{ 'active' if status_filter == 'pending' }}">Pendentes</a>
-    <a href="/?status=in_progress" class="{{ 'active' if status_filter == 'in_progress' }}">Em andamento</a>
-    <a href="/?status=done"        class="{{ 'active' if status_filter == 'done' }}">Concluídas</a>
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <a href="/"                    class="filter-pill {{ 'active' if not status_filter }}">Todas</a>
+      <a href="/?status=pending"     class="filter-pill {{ 'active' if status_filter == 'pending' }}{% if priority_filter %}&priority={{ priority_filter }}{% endif %}{% if category_filter %}&category_id={{ category_filter }}{% endif %}">Pendente</a>
+      <a href="/?status=in_progress" class="filter-pill {{ 'active' if status_filter == 'in_progress' }}{% if priority_filter %}&priority={{ priority_filter }}{% endif %}{% if category_filter %}&category_id={{ category_filter }}{% endif %}">Em andamento</a>
+      <a href="/?status=done"        class="filter-pill {{ 'active' if status_filter == 'done' }}{% if priority_filter %}&priority={{ priority_filter }}{% endif %}{% if category_filter %}&category_id={{ category_filter }}{% endif %}">Concluída</a>
+    </div>
+    <div class="filter-divider"></div>
+    <div class="filter-group">
+      <span class="filter-label">Prioridade</span>
+      <a href="/{% if status_filter %}?status={{ status_filter }}{% if category_filter %}&category_id={{ category_filter }}{% endif %}{% elif category_filter %}?category_id={{ category_filter }}{% endif %}" class="filter-pill {{ 'active' if not priority_filter }}">Todas</a>
+      <a href="/?priority=high{% if status_filter %}&status={{ status_filter }}{% endif %}{% if category_filter %}&category_id={{ category_filter }}{% endif %}"   class="filter-pill {{ 'active-high' if priority_filter == 'high' else '' }}">Alta</a>
+      <a href="/?priority=medium{% if status_filter %}&status={{ status_filter }}{% endif %}{% if category_filter %}&category_id={{ category_filter }}{% endif %}" class="filter-pill {{ 'active-medium' if priority_filter == 'medium' else '' }}">Média</a>
+      <a href="/?priority=low{% if status_filter %}&status={{ status_filter }}{% endif %}{% if category_filter %}&category_id={{ category_filter }}{% endif %}"    class="filter-pill {{ 'active-low' if priority_filter == 'low' else '' }}">Baixa</a>
+    </div>
+    {% if categories %}
+    <div class="filter-divider"></div>
+    <div class="filter-group">
+      <span class="filter-label">Categoria</span>
+      <select class="filter-select" onchange="location.href=this.value">
+        <option value="/?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if priority_filter %}priority={{ priority_filter }}{% endif %}" {{ 'selected' if not category_filter }}>Todas</option>
+        {% for cat in categories %}
+        <option value="/?category_id={{ cat.id }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if priority_filter %}&priority={{ priority_filter }}{% endif %}" {{ 'selected' if category_filter == cat.id }}>{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
   </div>
 
-  <!-- Lista -->
+  <!-- Task list -->
   <div class="task-list">
     {% for task in tasks %}
-    <div class="task">
-      <div class="task-info">
-        <div class="task-title">{{ task.title }}</div>
+    <div class="task-card priority-{{ task.priority }}">
+      <div class="task-body">
+        <div class="task-top">
+          <div class="task-title">{{ task.title }}</div>
+          <div class="task-badges">
+            {% if task.category_name %}
+            <span class="badge badge-cat" style="background:{{ task.category_color }}22; color:{{ task.category_color }}">{{ task.category_name }}</span>
+            {% endif %}
+            <span class="badge badge-priority-{{ task.priority }}">
+              {% if task.priority == 'high' %}▲ Alta{% elif task.priority == 'low' %}▽ Baixa{% else %}◆ Média{% endif %}
+            </span>
+            <span class="badge badge-status-{{ task.status }}">
+              {% if task.status == 'pending' %}Pendente
+              {% elif task.status == 'in_progress' %}Em andamento
+              {% else %}Concluída{% endif %}
+            </span>
+          </div>
+        </div>
         {% if task.description %}
         <div class="task-desc">{{ task.description }}</div>
         {% endif %}
-        <div class="task-date">{{ task.created_at }}</div>
+        <div class="task-meta">
+          {% if task.dl_label %}
+          <span class="badge-deadline {{ task.dl_class }}">📅 {{ task.dl_label }}</span>
+          {% endif %}
+          {% if task.start_time_str %}
+          <span class="badge-time">🕐 {{ task.start_time_str }}{% if task.estimated_time %} · {{ task.estimated_time | format_time }}{% endif %}</span>
+          {% elif task.estimated_time %}
+          <span class="badge-time">⏱ {{ task.estimated_time | format_time }}</span>
+          {% endif %}
+          <span class="badge-created">{{ task.created_at.strftime('%d/%m/%Y') if task.created_at else '' }}</span>
+        </div>
       </div>
 
-      <span class="badge badge-{{ task.status }}">
-        {% if task.status == 'pending' %}Pendente
-        {% elif task.status == 'in_progress' %}Em andamento
-        {% else %}Concluída{% endif %}
-      </span>
-
       <div class="task-actions">
-        <form method="POST" action="/update/{{ task.id }}" style="display:flex;gap:0.4rem;">
+        <!-- Status update -->
+        <form class="action-form" method="POST" action="/update/{{ task.id }}">
           <select name="status" class="status-select">
             <option value="pending"     {% if task.status == 'pending' %}selected{% endif %}>Pendente</option>
             <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>Em andamento</option>
             <option value="done"        {% if task.status == 'done' %}selected{% endif %}>Concluída</option>
           </select>
-          <button type="submit" class="btn-save">Salvar</button>
+          <button type="submit" class="btn-action btn-save-status">✓</button>
         </form>
-        <form method="POST" action="/delete/{{ task.id }}">
-          <button type="submit" class="btn-del" onclick="return confirm('Remover tarefa?')">✕</button>
-        </form>
+
+        <!-- Edit -->
+        <details class="edit-panel">
+          <summary>✎ Editar</summary>
+          <div class="edit-form-inner">
+            <form method="POST" action="/update/{{ task.id }}">
+              <div class="form-grid-2" style="margin-bottom:.6rem">
+                <div class="form-group">
+                  <label>Título</label>
+                  <input type="text" name="title" value="{{ task.title }}" required />
+                </div>
+                <div class="form-group">
+                  <label>Prioridade</label>
+                  <select name="priority">
+                    <option value="high"   {% if task.priority == 'high' %}selected{% endif %}>Alta</option>
+                    <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Média</option>
+                    <option value="low"    {% if task.priority == 'low' %}selected{% endif %}>Baixa</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom:.6rem">
+                <label>Descrição</label>
+                <textarea name="description">{{ task.description or '' }}</textarea>
+              </div>
+              <div class="form-grid-3" style="margin-bottom:.6rem">
+                <div class="form-group">
+                  <label>Categoria</label>
+                  <select name="category_id">
+                    <option value="">Sem categoria</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if task.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Prazo</label>
+                  <input type="date" name="deadline" value="{{ task.deadline.strftime('%Y-%m-%d') if task.deadline else '' }}" />
+                </div>
+                <div class="form-group">
+                  <label>Horário de início</label>
+                  <input type="time" name="start_time" value="{{ task.start_time_str or '' }}" />
+                </div>
+                <div class="form-group">
+                  <label>Duração (min)</label>
+                  <input type="number" name="estimated_time" min="1" value="{{ task.estimated_time or '' }}" />
+                </div>
+              </div>
+              <button type="submit" class="btn-submit">Salvar Alterações</button>
+            </form>
+          </div>
+        </details>
+
+        <!-- Delete -->
+        <div class="del-wrap">
+          <button type="button" class="btn-action btn-del" onclick="this.closest('.del-wrap').classList.toggle('confirming')">✕</button>
+          <div class="del-confirm-group">
+            <form method="POST" action="/delete/{{ task.id }}">
+              <button type="submit" class="btn-action btn-del-confirm">Excluir?</button>
+            </form>
+            <button type="button" class="btn-action btn-cancel-del" onclick="this.closest('.del-wrap').classList.remove('confirming')">Não</button>
+          </div>
+        </div>
       </div>
     </div>
     {% else %}
-    <div class="empty">
-      <span>📋</span>
-      Nenhuma tarefa encontrada.
+    <div class="empty-state">
+      <span class="empty-icon">📋</span>
+      <p>Nenhuma tarefa encontrada.<br>Crie sua primeira tarefa acima!</p>
     </div>
     {% endfor %}
   </div>
 
+  <!-- Categories section -->
+  <div class="categories-section" id="categories">
+    <div class="cat-section-header">Categorias {% if categories %}({{ categories | length }}){% endif %}</div>
+    <div class="cat-section-body">
+        {% if categories %}
+        <div class="cat-list">
+          {% for cat in categories %}
+          <div class="cat-item" style="background:{{ cat.color }}18; border: 1.5px solid {{ cat.color }}44">
+            <span class="cat-dot" style="background:{{ cat.color }}"></span>
+            <span style="color:{{ cat.color }}; font-weight:600">{{ cat.name }}</span>
+            <form method="POST" action="/categories/delete/{{ cat.id }}" style="display:inline">
+              <button type="submit" class="cat-del-btn" title="Remover">✕</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="font-size:.875rem; color:var(--text-muted); margin-bottom:.75rem">Nenhuma categoria criada ainda.</p>
+        {% endif %}
+
+        <form class="cat-add-form" method="POST" action="/categories/create">
+          <div class="form-group">
+            <label>Nome</label>
+            <input type="text" name="name" placeholder="Ex: Trabalho" required />
+          </div>
+          <div class="form-group" style="flex:0">
+            <label>Cor</label>
+            <input type="color" name="color" value="#6366f1" />
+          </div>
+          <button type="submit" class="btn-add-cat">+ Adicionar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
 </main>
+
+<script>
+  function toggleCreate() {
+    const panel = document.getElementById('create-panel');
+    const btn = document.getElementById('create-btn');
+    const open = panel.style.display === 'block';
+    panel.style.display = open ? 'none' : 'block';
+    btn.textContent = open ? '+ Nova Tarefa' : '✕ Cancelar';
+    btn.className = open ? 'btn-new-task' : 'btn-new-task cancel';
+    if (!open) panel.querySelector('input[name="title"]').focus();
+  }
+</script>
 
 </body>
 </html>

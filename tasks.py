@@ -1,61 +1,148 @@
 from database import get_connection
 
+_ALLOWED_TASK_KEYS = {"title", "description", "status", "priority", "deadline", "start_time", "estimated_time", "category_id"}
 
-def create_task(title: str, description: str = "") -> dict:
+
+def create_task(user_id: int, title: str, description=None, priority: str = "medium",
+                deadline=None, start_time=None, estimated_time=None, category_id=None) -> dict:
     with get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO tasks (title, description) VALUES (?, ?)",
-            (title, description),
-        )
-        task_id = cur.lastrowid
-    return get_task(task_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO tasks
+                   (user_id, title, description, priority, deadline, start_time, estimated_time, category_id)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (user_id, title, description, priority, deadline, start_time, estimated_time, category_id),
+            )
+            task_id = cur.lastrowid
+    return get_task(task_id, user_id)
 
 
-def get_task(task_id: int) -> dict | None:
+def get_task(task_id: int, user_id: int) -> dict | None:
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ?", (task_id,)
-        ).fetchone()
-        return dict(row) if row else None
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT t.*, c.name AS category_name, c.color AS category_color
+                   FROM tasks t
+                   LEFT JOIN categories c ON c.id = t.category_id
+                   WHERE t.id = %s AND t.user_id = %s""",
+                (task_id, user_id),
+            )
+            return cur.fetchone()
 
 
-def list_tasks(status: str | None = None) -> list[dict]:
-    with get_connection() as conn:
-        if status:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE status = ? ORDER BY created_at DESC",
-                (status,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM tasks ORDER BY created_at DESC"
-            ).fetchall()
-        return [dict(r) for r in rows]
+def list_tasks(user_id: int, status=None, priority=None, category_id=None) -> list[dict]:
+    conditions = ["t.user_id = %s"]
+    params = [user_id]
 
+    if status:
+        conditions.append("t.status = %s")
+        params.append(status)
+    if priority:
+        conditions.append("t.priority = %s")
+        params.append(priority)
+    if category_id:
+        conditions.append("t.category_id = %s")
+        params.append(category_id)
 
-def update_task(task_id: int, title: str | None = None,
-                description: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-
-    new_title  = title       if title       is not None else task["title"]
-    new_desc   = description if description is not None else task["description"]
-    new_status = status      if status      is not None else task["status"]
-
-    valid_statuses = {"pending", "in_progress", "done"}
-    if new_status not in valid_statuses:
-        raise ValueError(f"status deve ser um de {valid_statuses}")
+    where = " AND ".join(conditions)
 
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE tasks SET title=?, description=?, status=? WHERE id=?",
-            (new_title, new_desc, new_status, task_id),
-        )
-    return get_task(task_id)  # após commit
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""SELECT t.*, c.name AS category_name, c.color AS category_color
+                    FROM tasks t
+                    LEFT JOIN categories c ON c.id = t.category_id
+                    WHERE {where}
+                    ORDER BY
+                        FIELD(t.priority, 'high', 'medium', 'low'),
+                        (t.deadline IS NULL) ASC,
+                        t.deadline ASC,
+                        t.created_at DESC""",
+                params,
+            )
+            return cur.fetchall()
 
 
-def delete_task(task_id: int) -> bool:
+def update_task(task_id: int, user_id: int, **kwargs) -> dict | None:
+    updates = {k: v for k, v in kwargs.items() if k in _ALLOWED_TASK_KEYS}
+    if not updates:
+        return get_task(task_id, user_id)
+
+    set_clause = ", ".join(f"{k} = %s" for k in updates)
+    values = list(updates.values()) + [task_id, user_id]
+
     with get_connection() as conn:
-        cur = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        return cur.rowcount > 0
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE tasks SET {set_clause} WHERE id = %s AND user_id = %s",
+                values,
+            )
+    return get_task(task_id, user_id)
+
+
+def delete_task(task_id: int, user_id: int) -> bool:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM tasks WHERE id = %s AND user_id = %s",
+                (task_id, user_id),
+            )
+            return cur.rowcount > 0
+
+
+def get_stats(user_id: int) -> dict:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT
+                       COUNT(*) AS total,
+                       SUM(status = 'pending') AS pending,
+                       SUM(status = 'in_progress') AS in_progress,
+                       SUM(status = 'done') AS done,
+                       SUM(deadline < CURDATE() AND status != 'done') AS overdue
+                   FROM tasks
+                   WHERE user_id = %s""",
+                (user_id,),
+            )
+            row = cur.fetchone()
+    return {
+        "total": int(row["total"] or 0),
+        "pending": int(row["pending"] or 0),
+        "in_progress": int(row["in_progress"] or 0),
+        "done": int(row["done"] or 0),
+        "overdue": int(row["overdue"] or 0),
+    }
+
+
+def create_category(user_id: int, name: str, color: str = "#6366f1") -> dict:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO categories (user_id, name, color) VALUES (%s, %s, %s)",
+                (user_id, name, color),
+            )
+            cat_id = cur.lastrowid
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM categories WHERE id = %s", (cat_id,))
+            return cur.fetchone()
+
+
+def list_categories(user_id: int) -> list[dict]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM categories WHERE user_id = %s ORDER BY name ASC",
+                (user_id,),
+            )
+            return cur.fetchall()
+
+
+def delete_category(cat_id: int, user_id: int) -> bool:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM categories WHERE id = %s AND user_id = %s",
+                (cat_id, user_id),
+            )
+            return cur.rowcount > 0
