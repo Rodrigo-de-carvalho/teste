@@ -100,3 +100,14 @@ def init_db():
                         REFERENCES users(id) ON DELETE CASCADE
                 )
             """)
+
+            # Adiciona start_time se a tabela já existia sem essa coluna.
+            cur.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME   = 'tasks'
+                  AND COLUMN_NAME  = 'start_time'
+            """)
+            if cur.fetchone()["cnt"] == 0:
+                cur.execute("ALTER TABLE tasks ADD COLUMN start_time TIME AFTER deadline")
