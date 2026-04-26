@@ -102,15 +102,11 @@ def init_db():
             """)
 
             # Adiciona start_time se a tabela já existia sem essa coluna.
-            cur.execute("""
-                SELECT COUNT(*) AS cnt
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME   = 'tasks'
-                  AND COLUMN_NAME  = 'start_time'
-            """)
-            if cur.fetchone()["cnt"] == 0:
+            try:
                 cur.execute("ALTER TABLE tasks ADD COLUMN start_time TIME AFTER deadline")
+            except Exception as e:
+                if "Duplicate column" not in str(e):
+                    raise
 
             # Tabela para persistir configurações do app (ex: secret_key).
             cur.execute("""
@@ -123,15 +119,17 @@ def init_db():
 
 def get_or_create_secret_key() -> str:
     import secrets
+    key = None
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT value FROM app_config WHERE key_name = 'secret_key'")
             row = cur.fetchone()
             if row:
-                return row["value"]
-            key = secrets.token_hex(32)
-            cur.execute(
-                "INSERT INTO app_config (key_name, value) VALUES ('secret_key', %s)",
-                (key,),
-            )
-            return key
+                key = row["value"]
+            else:
+                key = secrets.token_hex(32)
+                cur.execute(
+                    "INSERT INTO app_config (key_name, value) VALUES ('secret_key', %s)",
+                    (key,),
+                )
+    return key
