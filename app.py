@@ -1,7 +1,7 @@
 import os
 import functools
-from datetime import date
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from datetime import date, timedelta
+from flask import Flask, render_template, request, redirect, url_for, session
 from database import init_db, get_or_create_secret_key
 from auth import create_user, authenticate, get_user
 from tasks import (
@@ -12,6 +12,7 @@ from tasks import (
 app = Flask(__name__)
 init_db()
 app.secret_key = os.environ.get("SECRET_KEY") or get_or_create_secret_key()
+app.permanent_session_lifetime = timedelta(days=30)
 
 
 def format_time(minutes):
@@ -87,6 +88,7 @@ def login():
         password = request.form.get("password", "")
         user = authenticate(username, password)
         if user:
+            session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             return redirect(url_for("index"))
@@ -112,6 +114,7 @@ def register():
         else:
             user = create_user(username, password)
             if user:
+                session.permanent = True
                 session["user_id"] = user["id"]
                 session["username"] = user["username"]
                 return redirect(url_for("index"))
