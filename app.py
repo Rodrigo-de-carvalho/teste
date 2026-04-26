@@ -4,6 +4,8 @@ from tasks import create_task, list_tasks, update_task, delete_task
 
 app = Flask(__name__)
 
+init_db()
+
 
 @app.route("/")
 def index():
@@ -36,5 +38,4 @@ def delete(task_id):
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
