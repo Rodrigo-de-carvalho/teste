@@ -17,38 +17,50 @@
     header {
       background: #4f46e5;
       color: white;
-      padding: 1.5rem 2rem;
+      padding: 1.25rem 1.5rem;
       display: flex;
       align-items: center;
       gap: 0.75rem;
     }
-    header h1 { font-size: 1.5rem; font-weight: 700; }
-    header span { font-size: 1.6rem; }
+    header h1 { font-size: 1.4rem; font-weight: 700; }
+    header span { font-size: 1.5rem; }
 
-    main { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
+    main { max-width: 860px; margin: 1.5rem auto; padding: 0 1rem; }
 
     /* Card nova tarefa */
     .card {
       background: white;
       border-radius: 12px;
-      padding: 1.5rem;
+      padding: 1.25rem;
       box-shadow: 0 1px 4px rgba(0,0,0,.08);
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
     }
-    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: #4f46e5; }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.875rem; color: #4f46e5; }
 
-    .form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .form-row input {
+      flex: 2;
+      min-width: 0;
+    }
+    .form-row textarea {
+      flex: 3;
+      min-width: 0;
+    }
     .form-row input, .form-row textarea {
-      flex: 1;
       padding: 0.6rem 0.9rem;
       border: 1px solid #d1d5db;
       border-radius: 8px;
       font-size: 0.95rem;
       outline: none;
       transition: border-color .2s;
+      width: 100%;
     }
     .form-row input:focus, .form-row textarea:focus { border-color: #4f46e5; }
-    textarea { resize: none; height: 42px; min-width: 200px; }
+    textarea { resize: none; height: 42px; }
 
     button.btn-add {
       background: #4f46e5;
@@ -61,6 +73,7 @@
       font-weight: 600;
       transition: background .2s;
       white-space: nowrap;
+      width: auto;
     }
     button.btn-add:hover { background: #4338ca; }
 
@@ -96,6 +109,7 @@
       align-items: center;
       gap: 1rem;
       transition: box-shadow .2s;
+      flex-wrap: wrap;
     }
     .task:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); }
 
@@ -103,17 +117,15 @@
     .task-title {
       font-weight: 600;
       font-size: 0.97rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
     .task-desc {
       font-size: 0.82rem;
       color: #6b7280;
       margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
     .task-date {
       font-size: 0.75rem;
@@ -127,12 +139,19 @@
       padding: 0.25rem 0.7rem;
       border-radius: 20px;
       white-space: nowrap;
+      flex-shrink: 0;
     }
-    .badge-pending    { background: #fef3c7; color: #92400e; }
+    .badge-pending     { background: #fef3c7; color: #92400e; }
     .badge-in_progress { background: #dbeafe; color: #1e40af; }
-    .badge-done       { background: #d1fae5; color: #065f46; }
+    .badge-done        { background: #d1fae5; color: #065f46; }
 
-    .task-actions { display: flex; gap: 0.4rem; align-items: center; }
+    .task-actions {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
 
     select.status-select {
       padding: 0.3rem 0.5rem;
@@ -172,6 +191,40 @@
       font-size: 0.95rem;
     }
     .empty span { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.15rem; }
+
+      .form-row { flex-direction: column; }
+      .form-row input,
+      .form-row textarea { width: 100%; }
+      button.btn-add { width: 100%; }
+      textarea { height: 60px; }
+
+      .task {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+      }
+
+      .task-info { width: 100%; }
+
+      .badge { align-self: flex-start; }
+
+      .task-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .task-actions form:first-child {
+        flex: 1;
+        display: flex;
+        gap: 0.4rem;
+      }
+
+      select.status-select { flex: 1; }
+    }
   </style>
 </head>
 <body>
