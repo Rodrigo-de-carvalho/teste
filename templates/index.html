@@ -184,6 +184,33 @@
     }
     button.btn-del:hover { background: #fca5a5; }
 
+    .del-wrap { display: flex; align-items: center; gap: 0.4rem; }
+    .del-confirm { display: none; align-items: center; gap: 0.3rem; }
+    .del-wrap.confirming .del-confirm { display: flex; }
+    button.btn-del-confirm {
+      background: #dc2626;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.3rem 0.7rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    button.btn-del-confirm:hover { background: #b91c1c; }
+    button.btn-cancel {
+      background: #e5e7eb;
+      color: #374151;
+      border: none;
+      border-radius: 6px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.btn-cancel:hover { background: #d1d5db; }
+
     .empty {
       text-align: center;
       padding: 3rem;
@@ -226,7 +253,9 @@
       select.status-select { flex: 1; }
 
       button.btn-save,
-      button.btn-del {
+      button.btn-del,
+      button.btn-del-confirm,
+      button.btn-cancel {
         min-height: 44px;
         min-width: 44px;
         font-size: 1rem;
@@ -296,9 +325,13 @@
           </select>
           <button type="submit" class="btn-save">Salvar</button>
         </form>
-        <form method="POST" action="/delete/{{ task.id }}">
-          <button type="submit" class="btn-del" onclick="return confirm('Remover tarefa?')">✕</button>
-        </form>
+        <div class="del-wrap">
+          <button type="button" class="btn-del" onclick="this.closest('.del-wrap').classList.toggle('confirming')">✕</button>
+          <form method="POST" action="/delete/{{ task.id }}" class="del-confirm">
+            <button type="submit" class="btn-del-confirm">Excluir?</button>
+            <button type="button" class="btn-cancel" onclick="this.closest('.del-wrap').classList.remove('confirming')">Não</button>
+          </form>
+        </div>
       </div>
     </div>
     {% else %}
