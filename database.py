@@ -89,6 +89,7 @@ def init_db():
                     status         VARCHAR(50)  NOT NULL DEFAULT 'pending',
                     priority       VARCHAR(20)  NOT NULL DEFAULT 'medium',
                     deadline       DATE,
+                    start_time     TIME,
                     estimated_time INT,
                     category_id    INT,
                     user_id        INT          NOT NULL,

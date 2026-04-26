@@ -1,17 +1,17 @@
 from database import get_connection
 
-_ALLOWED_TASK_KEYS = {"title", "description", "status", "priority", "deadline", "estimated_time", "category_id"}
+_ALLOWED_TASK_KEYS = {"title", "description", "status", "priority", "deadline", "start_time", "estimated_time", "category_id"}
 
 
 def create_task(user_id: int, title: str, description=None, priority: str = "medium",
-                deadline=None, estimated_time=None, category_id=None) -> dict:
+                deadline=None, start_time=None, estimated_time=None, category_id=None) -> dict:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO tasks
-                   (user_id, title, description, priority, deadline, estimated_time, category_id)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                (user_id, title, description, priority, deadline, estimated_time, category_id),
+                   (user_id, title, description, priority, deadline, start_time, estimated_time, category_id)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (user_id, title, description, priority, deadline, start_time, estimated_time, category_id),
             )
             task_id = cur.lastrowid
     return get_task(task_id, user_id)

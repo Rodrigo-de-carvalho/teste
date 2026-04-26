@@ -150,6 +150,7 @@ def create():
     description = request.form.get("description", "").strip() or None
     priority = request.form.get("priority", "medium")
     deadline = request.form.get("deadline") or None
+    start_time = request.form.get("start_time") or None
     estimated_time = request.form.get("estimated_time") or None
     if estimated_time is not None:
         try:
@@ -164,7 +165,8 @@ def create():
             category_id = None
     if title:
         create_task(user_id, title, description=description, priority=priority,
-                    deadline=deadline, estimated_time=estimated_time, category_id=category_id)
+                    deadline=deadline, start_time=start_time,
+                    estimated_time=estimated_time, category_id=category_id)
     return redirect(url_for("index"))
 
 
@@ -173,7 +175,7 @@ def create():
 def update(task_id):
     user_id = session["user_id"]
     fields = {}
-    for key in ("title", "description", "status", "priority", "deadline"):
+    for key in ("title", "description", "status", "priority", "deadline", "start_time"):
         val = request.form.get(key)
         if val is not None:
             fields[key] = val if val != "" else None

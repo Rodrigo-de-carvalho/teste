@@ -470,25 +470,13 @@
       margin-top: 1.5rem;
       overflow: hidden;
     }
-    details.cat-section > summary {
-      list-style: none;
-      cursor: pointer;
+    .cat-section-header {
       padding: 0.875rem 1rem;
       font-size: 0.9rem;
       font-weight: 600;
       color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      user-select: none;
-      border-bottom: 1px solid transparent;
-      transition: background .15s;
+      border-bottom: 1px solid var(--border);
     }
-    details.cat-section > summary:hover { background: #f8fafc; }
-    details.cat-section[open] > summary { border-bottom-color: var(--border); }
-    details.cat-section > summary::-webkit-details-marker { display: none; }
-    details.cat-section > summary::before { content: '▶'; font-size: 0.7rem; color: var(--text-muted); transition: transform .2s; }
-    details.cat-section[open] > summary::before { transform: rotate(90deg); }
 
     .cat-section-body { padding: 1rem; }
 
@@ -683,7 +671,11 @@
           <input type="date" name="deadline" />
         </div>
         <div class="form-group">
-          <label>Tempo estimado (min)</label>
+          <label>Horário de início</label>
+          <input type="time" name="start_time" />
+        </div>
+        <div class="form-group">
+          <label>Duração estimada (min)</label>
           <input type="number" name="estimated_time" min="1" placeholder="ex: 90" />
         </div>
       </div>
@@ -750,7 +742,9 @@
           {% if task.dl_label %}
           <span class="badge-deadline {{ task.dl_class }}">📅 {{ task.dl_label }}</span>
           {% endif %}
-          {% if task.estimated_time %}
+          {% if task.start_time %}
+          <span class="badge-time">🕐 {{ task.start_time.strftime('%H:%M') if task.start_time else '' }}{% if task.estimated_time %} · {{ task.estimated_time | format_time }}{% endif %}</span>
+          {% elif task.estimated_time %}
           <span class="badge-time">⏱ {{ task.estimated_time | format_time }}</span>
           {% endif %}
           <span class="badge-created">{{ task.created_at.strftime('%d/%m/%Y') if task.created_at else '' }}</span>
@@ -806,7 +800,11 @@
                   <input type="date" name="deadline" value="{{ task.deadline.strftime('%Y-%m-%d') if task.deadline else '' }}" />
                 </div>
                 <div class="form-group">
-                  <label>Tempo (min)</label>
+                  <label>Horário de início</label>
+                  <input type="time" name="start_time" value="{{ task.start_time.strftime('%H:%M') if task.start_time else '' }}" />
+                </div>
+                <div class="form-group">
+                  <label>Duração (min)</label>
                   <input type="number" name="estimated_time" min="1" value="{{ task.estimated_time or '' }}" />
                 </div>
               </div>
@@ -837,9 +835,8 @@
 
   <!-- Categories section -->
   <div class="categories-section" id="categories">
-    <details class="cat-section">
-      <summary>Categorias {% if categories %}({{ categories | length }}){% endif %}</summary>
-      <div class="cat-section-body">
+    <div class="cat-section-header">Categorias {% if categories %}({{ categories | length }}){% endif %}</div>
+    <div class="cat-section-body">
         {% if categories %}
         <div class="cat-list">
           {% for cat in categories %}
@@ -868,7 +865,7 @@
           <button type="submit" class="btn-add-cat">+ Adicionar</button>
         </form>
       </div>
-    </details>
+    </div>
   </div>
 
 </main>
