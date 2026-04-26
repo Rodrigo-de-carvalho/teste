@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 import pymysql
 import pymysql.cursors
 from contextlib import contextmanager
@@ -6,18 +7,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# DEBUG — lista todas as variáveis de ambiente relacionadas a MySQL
-print("=== DEBUG MYSQL ENV VARS ===")
-for key, val in os.environ.items():
-    if "MYSQL" in key.upper() or "DATABASE" in key.upper():
-        masked = val[:4] + "***" if key.upper().endswith("PASSWORD") and val else val
-        print(f"  {key} = {masked}")
-print("============================")
-
 
 def _get_config():
-    # Railway injects MYSQLHOST/MYSQLUSER/... (no underscore separator).
-    # Fall back to MYSQL_HOST/... for local .env usage.
+    url = os.environ.get("DATABASE_URL") or os.environ.get("MYSQL_URL")
+    if url:
+        # Railway provides mysql://user:pass@host:port/db
+        parsed = urllib.parse.urlparse(url)
+        return {
+            "host": parsed.hostname,
+            "port": parsed.port or 3306,
+            "user": parsed.username,
+            "password": parsed.password,
+            "database": parsed.path.lstrip("/"),
+            "cursorclass": pymysql.cursors.DictCursor,
+            "autocommit": False,
+        }
+
+    # Fallback: variáveis individuais (Railway sem underscore ou local com underscore)
     return {
         "host": os.environ.get("MYSQLHOST") or os.environ.get("MYSQL_HOST", "localhost"),
         "port": int(os.environ.get("MYSQLPORT") or os.environ.get("MYSQL_PORT", 3306)),
