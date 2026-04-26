@@ -6,9 +6,9 @@ from contextlib import contextmanager
 
 def _connect():
     return pymysql.connect(
-        host=os.environ.get('MYSQL_HOST', 'localhost'),
-        port=int(os.environ.get('MYSQL_PORT', 3306)),
-        user=os.environ.get('MYSQL_USER', 'root'),
+        host=os.environ.get('MYSQLHOST', 'localhost'),
+        port=int(os.environ.get('MYSQLPORT', 3306)),
+        user=os.environ.get('MYSQLUSER', 'root'),
         password=os.environ.get('MYSQL_PASSWORD', ''),
         database=os.environ.get('MYSQL_DATABASE', 'tasks'),
         cursorclass=pymysql.cursors.DictCursor,
