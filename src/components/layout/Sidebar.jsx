@@ -10,7 +10,7 @@ const NAV = [
 ]
 
 export default function Sidebar() {
-  const { sidebarOpen, setSidebarOpen, setPage, currentPage, user, getXpProgress } = useStore()
+  const { sidebarOpen, setSidebarOpen, setPage, currentPage, user, getXpProgress, logout } = useStore()
   const xp = getXpProgress()
 
   // close on outside click / esc
@@ -54,7 +54,9 @@ export default function Sidebar() {
                 </div>
                 <div>
                   <p className="font-display font-bold text-primary text-lg tracking-tight leading-none">Forge</p>
-                  <p className="text-on-surface-variant text-xs font-label mt-0.5">Olá, {user.name} 👋</p>
+                  <p className="text-on-surface-variant text-xs font-label mt-0.5 truncate max-w-[140px]">
+                    {user.email || `Olá, ${user.name} 👋`}
+                  </p>
                 </div>
               </div>
               <button
@@ -88,6 +90,10 @@ export default function Sidebar() {
               <button className="sidebar-item w-full text-left">
                 <span className="material-symbols-outlined text-[22px]">settings</span>
                 <span>Configurações</span>
+              </button>
+              <button onClick={logout} className="sidebar-item w-full text-left !text-error hover:!bg-error-container/20">
+                <span className="material-symbols-outlined text-[22px]">logout</span>
+                <span>Sair</span>
               </button>
             </nav>
 

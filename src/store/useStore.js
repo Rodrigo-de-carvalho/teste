@@ -139,13 +139,17 @@ const useStore = create(
       // ─ State ─
       tasks:        SEED_TASKS,
       user: {
-        name:        'Rodrigo',
-        xp:          240,
-        streak:      3,
+        name:        'Visitante',
+        xp:          0,
+        streak:      0,
         totalFocusSec: 0,
         todayFocusSec: 0,
+        avatar:      null,
+        email:       null,
       },
-      focusTaskId:  '1',
+      isLoggedIn:   false,   // true quando autenticado via Google
+      isLoading:    false,
+      focusTaskId:  null,
       darkMode:     false,
       currentPage:  'dashboard',
       sidebarOpen:  false,
@@ -163,6 +167,31 @@ const useStore = create(
       initTheme: () => {
         const dark = useStore.getState().darkMode
         applyTheme(dark)
+      },
+
+      // ─ API Sync ─
+      loadUserFromApi: async () => {
+        try {
+          const { api } = await import('../lib/api.js')
+          const userData = await api.auth.me()
+          if (!userData) return
+          set({ user: { ...userData }, isLoggedIn: true })
+        } catch { /* offline ou não autenticado */ }
+      },
+
+      loadTasksFromApi: async () => {
+        try {
+          const { api, isAuthenticated } = await import('../lib/api.js')
+          if (!isAuthenticated()) return
+          set({ isLoading: true })
+          const tasks = await api.tasks.list()
+          if (tasks) set({ tasks, isLoading: false })
+        } catch { set({ isLoading: false }) }
+      },
+
+      logout: () => {
+        import('../lib/api.js').then(({ clearToken }) => clearToken())
+        set({ isLoggedIn: false, tasks: SEED_TASKS, user: { name: 'Visitante', xp: 0, streak: 0, totalFocusSec: 0, todayFocusSec: 0, avatar: null, email: null }, currentPage: 'login' })
       },
 
       // ─ Navigation ─
@@ -183,46 +212,63 @@ const useStore = create(
         },
       })),
 
-      // ─ Tasks CRUD ─
-      addTask: (data) => {
+      // ─ Tasks CRUD (optimistic updates + API sync) ─
+      addTask: async (data) => {
+        const tempId = `temp_${Date.now()}`
         const task = {
-          id:          Date.now().toString(),
-          title:       data.title.trim(),
-          notes:       data.notes || '',
-          priority:    data.priority || 'medium',
-          project:     data.project || 'Geral',
-          dueDate:     data.dueDate || null,
-          dueTime:     data.dueTime || null,
-          completed:   false,
-          completedAt: null,
-          createdAt:   new Date().toISOString(),
-          weekDay:     data.weekDay ?? null,
-          subtasks:    data.subtasks || [],
+          id: tempId, title: data.title.trim(), notes: data.notes || '',
+          priority: data.priority || 'medium', project: data.project || 'Geral',
+          dueDate: data.dueDate || null, dueTime: data.dueTime || null,
+          completed: false, completedAt: null,
+          createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,
+          subtasks: data.subtasks || [],
         }
+        // Optimistic
         set((s) => ({ tasks: [task, ...s.tasks] }))
+
+        // Sync to API if logged in
+        try {
+          const { api, isAuthenticated } = await import('../lib/api.js')
+          if (isAuthenticated()) {
+            const saved = await api.tasks.create(data)
+            if (saved) set((s) => ({ tasks: s.tasks.map(t => t.id === tempId ? saved : t) }))
+          }
+        } catch { /* keep local */ }
         return task
       },
 
-      updateTask: (id, patch) => set((s) => ({
-        tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-        editingTask: s.editingTask?.id === id ? { ...s.editingTask, ...patch } : s.editingTask,
-      })),
+      updateTask: async (id, patch) => {
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+          editingTask: s.editingTask?.id === id ? { ...s.editingTask, ...patch } : s.editingTask,
+        }))
+        try {
+          const { api, isAuthenticated } = await import('../lib/api.js')
+          if (isAuthenticated()) await api.tasks.update(id, patch)
+        } catch { /* keep local */ }
+      },
 
-      deleteTask: (id) => set((s) => ({
-        tasks: s.tasks.filter((t) => t.id !== id),
-        focusTaskId: s.focusTaskId === id ? null : s.focusTaskId,
-        editingTask: s.editingTask?.id === id ? null : s.editingTask,
-      })),
+      deleteTask: async (id) => {
+        set((s) => ({
+          tasks: s.tasks.filter((t) => t.id !== id),
+          focusTaskId: s.focusTaskId === id ? null : s.focusTaskId,
+          editingTask: s.editingTask?.id === id ? null : s.editingTask,
+        }))
+        try {
+          const { api, isAuthenticated } = await import('../lib/api.js')
+          if (isAuthenticated()) await api.tasks.delete(id)
+        } catch { /* keep local */ }
+      },
 
-      completeTask: (id) => {
-        const { tasks, user, xpToast } = get()
+      completeTask: async (id) => {
+        const { tasks, user } = get()
         const task = tasks.find((t) => t.id === id)
         if (!task || task.completed) return
 
-        const xpGain     = XP_TABLE[task.priority] ?? 20
-        const oldLevel   = levelFromXp(user.xp)
-        const newXp      = user.xp + xpGain
-        const newLevel   = levelFromXp(newXp)
+        const xpGain   = XP_TABLE[task.priority] ?? 20
+        const oldLevel = levelFromXp(user.xp)
+        const newXp    = user.xp + xpGain
+        const newLevel = levelFromXp(newXp)
 
         set((s) => ({
           tasks: s.tasks.map((t) =>
@@ -230,18 +276,33 @@ const useStore = create(
           ),
           user: { ...s.user, xp: newXp },
           xpToast: { amount: xpGain, taskTitle: task.title, key: Date.now() },
-          levelUpModal: newLevel > oldLevel ? { from: oldLevel, to: newLevel } : s.levelUpModal,
+          levelUpModal: newLevel > oldLevel ? { from: oldLevel, to: newLevel } : null,
           focusTaskId: s.focusTaskId === id
             ? (s.tasks.find((t) => !t.completed && t.id !== id)?.id || null)
             : s.focusTaskId,
         }))
+
+        // Sync to API
+        try {
+          const { api, isAuthenticated } = await import('../lib/api.js')
+          if (isAuthenticated()) {
+            await api.tasks.update(id, { completed: true })
+            await api.auth.updateMe({ xp: newXp, level: newLevel })
+          }
+        } catch { /* keep local */ }
       },
 
-      uncompleteTask: (id) => set((s) => ({
-        tasks: s.tasks.map((t) =>
-          t.id === id ? { ...t, completed: false, completedAt: null } : t
-        ),
-      })),
+      uncompleteTask: async (id) => {
+        set((s) => ({
+          tasks: s.tasks.map((t) =>
+            t.id === id ? { ...t, completed: false, completedAt: null } : t
+          ),
+        }))
+        try {
+          const { api, isAuthenticated } = await import('../lib/api.js')
+          if (isAuthenticated()) await api.tasks.update(id, { completed: false })
+        } catch { /* keep local */ }
+      },
 
       clearXpToast:      () => set({ xpToast: null }),
       clearLevelUpModal: () => set({ levelUpModal: null }),

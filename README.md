@@ -1,16 +1,59 @@
-# React + Vite
+# 🔥 Forge — Gerenciador de Tarefas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+App de produtividade com design premium, dark mode e sincronização em nuvem.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Camada   | Tecnologia |
+|----------|------------|
+| Frontend | React + Vite + Tailwind CSS + Framer Motion |
+| Backend  | Node.js + Express + Passport.js (Google OAuth) |
+| Banco    | PostgreSQL (Railway) |
+| ORM      | Prisma |
+| Deploy FE | Vercel |
+| Deploy BE | Railway |
 
-## React Compiler
+## Setup local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Frontend
+```bash
+cp .env.example .env   # edite VITE_API_URL se necessário
+npm install && npm run dev
+```
 
-## Expanding the ESLint configuration
+### Backend (pasta forge-api)
+```bash
+cp .env.example .env   # preencha as variáveis
+npm install
+npm run db:push        # cria tabelas no banco
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Configurar Google OAuth
+
+1. Acesse [console.cloud.google.com](https://console.cloud.google.com)
+2. APIs e Serviços → Credenciais → **Criar ID de cliente OAuth 2.0**
+3. Tipo: Aplicativo Web
+4. Origens autorizadas: `http://localhost:3001` e URL do Railway em prod
+5. URIs de redirecionamento: `http://localhost:3001/auth/google/callback`
+6. Copie **Client ID** e **Client Secret** para o `.env` do backend
+
+## Deploy Railway (Backend)
+
+Variáveis de ambiente necessárias:
+- `DATABASE_URL` — gerada automaticamente ao linkar o Postgres
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_CALLBACK_URL` = `https://sua-api.railway.app/auth/google/callback`
+- `JWT_SECRET` = string aleatória longa
+- `FRONTEND_URL` = `https://seu-app.vercel.app`
+
+## Funcionalidades
+
+- Login com Google OAuth 2.0
+- Sync entre dispositivos em tempo real
+- Dashboard com timer Pomodoro
+- Captura rápida `Ctrl+K`
+- Sistema de XP e níveis com animações
+- Dark mode nativo
+- Planejamento semanal drag & drop
+- Insights e gráficos de produtividade
