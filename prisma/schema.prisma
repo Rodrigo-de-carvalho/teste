@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  googleId      String   @unique
+  email         String   @unique
+  name          String
+  avatar        String?
+  xp            Int      @default(0)
+  level         Int      @default(1)
+  streak        Int      @default(0)
+  lastActiveDate String?
+  totalFocusSec Int      @default(0)
+  todayFocusSec Int      @default(0)
+  focusTaskId   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tasks         Task[]
+
+  @@map("users")
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  notes       String    @default("")
+  priority    String    @default("medium")
+  project     String    @default("Geral")
+  dueDate     String?
+  dueTime     String?
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  weekDay     Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subtasks    Subtask[]
+
+  @@map("tasks")
+}
+
+model Subtask {
+  id     String  @id @default(cuid())
+  title  String
+  done   Boolean @default(false)
+  taskId String
+  task   Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("subtasks")
+}
