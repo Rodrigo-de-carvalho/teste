@@ -42,7 +42,7 @@ export default function AuthCallback() {
           <span className="material-symbols-outlined text-white text-[28px]"
             style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
         </div>
-        <p className="font-display font-semibold text-on-surface text-lg">Entrando no Forge...</p>
+        <p className="font-display font-semibold text-on-surface text-lg">Entrando no Forje...</p>
         <p className="text-on-surface-variant text-sm mt-1">Aguarde um instante ✨</p>
       </div>
     </div>

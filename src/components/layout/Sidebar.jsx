@@ -53,7 +53,7 @@ export default function Sidebar() {
                   </span>
                 </div>
                 <div>
-                  <p className="font-display font-bold text-primary text-lg tracking-tight leading-none">Forge</p>
+                  <p className="font-display font-bold text-primary text-lg tracking-tight leading-none">Forje</p>
                   <p className="text-on-surface-variant text-xs font-label mt-0.5 truncate max-w-[140px]">
                     {user.email || `Olá, ${user.name} 👋`}
                   </p>

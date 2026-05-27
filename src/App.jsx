@@ -96,7 +96,7 @@ export default function App() {
             <span className="material-symbols-outlined text-white text-[28px]"
               style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
           </div>
-          <p className="font-display font-semibold text-on-surface text-lg">Forjando...</p>
+          <p className="font-display font-semibold text-on-surface text-lg">Forjando seu dia...</p>
         </div>
       </div>
     )

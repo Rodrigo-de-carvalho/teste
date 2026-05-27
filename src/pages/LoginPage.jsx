@@ -55,8 +55,8 @@ export default function LoginPage() {
             <span className="material-symbols-outlined text-white text-[36px]"
               style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
           </motion.div>
-          <h1 className="font-display font-bold text-on-surface text-4xl tracking-tighter mb-2">Forge</h1>
-          <p className="text-on-surface-variant">Forje seu dia com intenção.</p>
+          <h1 className="font-display font-bold text-on-surface text-4xl tracking-tighter mb-2">Forje</h1>
+          <p className="text-on-surface-variant">Forje seu dia com intenção. ⚡</p>
         </div>
 
         {/* Card */}
@@ -83,7 +83,7 @@ export default function LoginPage() {
           </button>
 
           <p className="text-on-surface-variant/50 text-xs text-center mt-5">
-            Seus dados são só seus. O Forge não compartilha nada. 🔒
+            Seus dados são só seus. O Forje não compartilha nada. 🔒
           </p>
         </div>
 

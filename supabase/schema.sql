@@ -46,17 +46,20 @@ alter table public.subtasks   enable row level security;
 alter table public.user_stats enable row level security;
 
 -- Tasks: usuário só vê/edita as próprias
+drop policy if exists "tasks_own" on public.tasks;
 create policy "tasks_own" on public.tasks
   for all using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
 -- Subtasks: usuário só vê subtasks das próprias tarefas
+drop policy if exists "subtasks_own" on public.subtasks;
 create policy "subtasks_own" on public.subtasks
   for all using (
     task_id in (select id from public.tasks where user_id = auth.uid())
   );
 
 -- User stats: usuário só acessa os próprios stats
+drop policy if exists "stats_own" on public.user_stats;
 create policy "stats_own" on public.user_stats
   for all using (auth.uid() = id)
   with check (auth.uid() = id);
@@ -92,6 +95,21 @@ create trigger tasks_updated_at
   for each row execute function public.set_updated_at();
 
 -- ── Habilitar Realtime nas tabelas ────────────────────────────
-alter publication supabase_realtime add table public.tasks;
-alter publication supabase_realtime add table public.subtasks;
-alter publication supabase_realtime add table public.user_stats;
+-- (ignora se já estiver na publicação)
+do $$
+begin
+  alter publication supabase_realtime add table public.tasks;
+exception when others then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.subtasks;
+exception when others then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.user_stats;
+exception when others then null;
+end $$;

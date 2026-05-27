@@ -108,7 +108,7 @@ export default function Inbox() {
               <p className="text-on-surface-variant text-sm mb-6">
                 {filter === 'completed'
                   ? 'Complete tarefas para vê-las aqui'
-                  : search ? 'Nenhuma tarefa encontrada' : 'Hora de adicionar algo ao Forge'
+                  : search ? 'Nenhuma tarefa encontrada' : 'Hora de adicionar algo ao Forje'
                 }
               </p>
               {filter !== 'completed' && !search && (

@@ -31,7 +31,7 @@ export default function TopBar() {
         </button>
         <div>
           <h1 className="font-display font-bold text-primary text-2xl leading-none tracking-tighter">
-            Forge
+            Forje
           </h1>
           <p className="text-on-surface-variant text-[10px] font-label tracking-widest uppercase hidden md:block">
             {todayString()}
