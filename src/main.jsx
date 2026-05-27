@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import useStore from './store/useStore.js'
 
-// Apply saved theme before first render to avoid flash
+// Aplica o tema salvo antes do primeiro render (evita flash)
 useStore.getState().initTheme()
 
 createRoot(document.getElementById('root')).render(
