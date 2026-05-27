@@ -1,0 +1,75 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        // These are fixed (don't change with theme)
+        primary:            '#6b38d4',
+        'primary-container':'#8455ef',
+        'on-primary':       '#ffffff',
+        tertiary:           '#855000',
+        'on-tertiary':      '#ffffff',
+        error:              '#ba1a1a',
+        'error-container':  '#ffdad6',
+        'on-error':         '#ffffff',
+        'on-error-container': '#93000a',
+        success:            '#1e7f4e',
+        'success-container':'#b7f0d1',
+        'primary-fixed':    '#e9ddff',
+        'inverse-primary':  '#d0bcff',
+
+        // These reference CSS variables so they adapt to dark mode
+        background:               'var(--clr-bg)',
+        surface:                  'var(--clr-surface)',
+        'surface-container-low':  'var(--clr-surface-low)',
+        'surface-container':      'var(--clr-surface-ctn)',
+        'surface-container-high': 'var(--clr-surface-high)',
+        'surface-container-highest': 'var(--clr-surface-highest)',
+        'on-surface':             'var(--clr-on-surface)',
+        'on-surface-variant':     'var(--clr-on-variant)',
+        'outline':                'var(--clr-outline)',
+        'outline-variant':        'var(--clr-outline-var)',
+        'secondary-container':    'var(--clr-secondary-ctn)',
+        'inverse-surface':        'var(--clr-inverse)',
+        'inverse-on-surface':     'var(--clr-inverse-on)',
+        'white-card':             'var(--clr-white-card)',
+      },
+      fontFamily: {
+        display: ['Hanken Grotesk', 'sans-serif'],
+        body:    ['Inter', 'sans-serif'],
+        label:   ['Geist', 'monospace'],
+      },
+      borderRadius: {
+        sm:      '0.25rem',
+        DEFAULT: '0.5rem',
+        md:      '0.75rem',
+        lg:      '1rem',
+        xl:      '1.5rem',
+        full:    '9999px',
+      },
+      boxShadow: {
+        card:           'var(--shadow-card)',
+        'card-hover':   'var(--shadow-card-hover)',
+        'primary-glow': '0px 8px 24px rgba(107,56,212,0.35)',
+        float:          'var(--shadow-float)',
+      },
+      animation: {
+        'fade-in':       'fadeIn 0.4s ease-out',
+        'slide-up':      'slideUp 0.4s cubic-bezier(0.4,0,0.2,1)',
+        'xp-pop':        'xpPop 0.8s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        'pulse-violet':  'pulseViolet 2s ease-in-out infinite',
+        'level-up':      'levelUp 0.8s cubic-bezier(0.34,1.56,0.64,1)',
+      },
+      keyframes: {
+        fadeIn:     { from: { opacity: '0' }, to: { opacity: '1' } },
+        slideUp:    { from: { opacity: '0', transform: 'translateY(16px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        xpPop:      { '0%': { opacity: '1', transform: 'scale(0.8) translateY(0)' }, '100%': { opacity: '0', transform: 'scale(1.2) translateY(-70px)' } },
+        pulseViolet:{ '0%,100%': { boxShadow: '0 0 0 0 rgba(107,56,212,0.3)' }, '50%': { boxShadow: '0 0 0 12px rgba(107,56,212,0)' } },
+        levelUp:    { from: { opacity: '0', transform: 'scale(0.8)' }, to: { opacity: '1', transform: 'scale(1)' } },
+      },
+    },
+  },
+  plugins: [],
+}

@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── CSS Variables (Light / Dark) ──────────────────────────────────────── */
+:root {
+  --clr-bg:              #f8f9ff;
+  --clr-surface:         #f8f9ff;
+  --clr-surface-low:     #eff4ff;
+  --clr-surface-ctn:     #e5eeff;
+  --clr-surface-high:    #dce9ff;
+  --clr-surface-highest: #d3e4fe;
+  --clr-white-card:      #ffffff;
+  --clr-on-surface:      #0b1c30;
+  --clr-on-variant:      #494454;
+  --clr-outline:         #7b7486;
+  --clr-outline-var:     #cbc3d7;
+  --clr-secondary-ctn:   #e3e1ed;
+  --clr-inverse:         #213145;
+  --clr-inverse-on:      #eaf1ff;
+  --clr-glass-bg:        rgba(255,255,255,0.75);
+  --clr-glass-border:    rgba(255,255,255,0.6);
+  --clr-nav-bg:          rgba(248,249,255,0.85);
+  --shadow-card:         0px 4px 20px rgba(0,0,0,0.04);
+  --shadow-card-hover:   0px 10px 30px rgba(107,56,212,0.08);
+  --shadow-float:        0px 20px 60px rgba(0,0,0,0.12);
+}
+
+html.dark {
+  --clr-bg:              #0d1420;
+  --clr-surface:         #0d1420;
+  --clr-surface-low:     #111927;
+  --clr-surface-ctn:     #16212f;
+  --clr-surface-high:    #1a2638;
+  --clr-surface-highest: #1f2d42;
+  --clr-white-card:      #141e2e;
+  --clr-on-surface:      #ddeeff;
+  --clr-on-variant:      #94a8c0;
+  --clr-outline:         #4a5568;
+  --clr-outline-var:     #2d3f55;
+  --clr-secondary-ctn:   #1e2d40;
+  --clr-inverse:         #e2eeff;
+  --clr-inverse-on:      #0b1c30;
+  --clr-glass-bg:        rgba(13,20,32,0.85);
+  --clr-glass-border:    rgba(255,255,255,0.08);
+  --clr-nav-bg:          rgba(13,20,32,0.92);
+  --shadow-card:         0px 4px 20px rgba(0,0,0,0.25);
+  --shadow-card-hover:   0px 10px 30px rgba(107,56,212,0.18);
+  --shadow-float:        0px 20px 60px rgba(0,0,0,0.5);
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--clr-bg);
+    color: var(--clr-on-surface);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    margin: 0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  #root { width: 100%; min-height: 100dvh; }
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 1;
+    user-select: none;
+  }
+}
+
+@layer components {
+  /* Glass effect adapts to dark mode via CSS vars */
+  .glass {
+    background: var(--clr-glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-color: var(--clr-glass-border) !important;
+  }
+
+  /* Token-based card */
+  .forge-card {
+    background: var(--clr-white-card);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.3s ease, transform 0.3s ease, background-color 0.3s ease;
+  }
+  .forge-card:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
+
+  /* Task card (alias) */
+  .task-card {
+    background: var(--clr-white-card);
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.3s ease, transform 0.3s ease, background-color 0.3s ease;
+  }
+  .task-card:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white font-label font-semibold rounded-lg px-5 py-2.5 text-sm
+           transition-all duration-200 hover:opacity-90 active:scale-95 shadow-primary-glow
+           flex items-center gap-2 whitespace-nowrap;
+  }
+  .btn-ghost {
+    @apply text-sm font-label font-medium rounded-lg px-5 py-2.5
+           transition-all duration-200 active:scale-95 flex items-center gap-2 whitespace-nowrap
+           border;
+    color: var(--clr-on-variant);
+    border-color: var(--clr-outline-var);
+    background: transparent;
+  }
+  .btn-ghost:hover { background: var(--clr-secondary-ctn); }
+
+  .input-forge {
+    @apply w-full bg-transparent outline-none py-2 font-body text-base transition-colors duration-200;
+    border-bottom: 2px solid var(--clr-outline-var);
+    color: var(--clr-on-surface);
+  }
+  .input-forge::placeholder { color: color-mix(in srgb, var(--clr-on-variant) 50%, transparent); }
+  .input-forge:focus { border-bottom-color: #6b38d4; }
+
+  .input-field {
+    @apply w-full rounded-lg px-4 py-2.5 text-sm outline-none transition-all duration-200;
+    background: var(--clr-surface-low);
+    border: 1px solid var(--clr-outline-var);
+    color: var(--clr-on-surface);
+  }
+  .input-field::placeholder { color: color-mix(in srgb, var(--clr-on-variant) 60%, transparent); }
+  .input-field:focus { border-color: #6b38d4; box-shadow: 0 0 0 3px rgba(107,56,212,0.12); }
+
+  .chip {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-label font-semibold
+           tracking-wide uppercase;
+  }
+
+  .nav-item {
+    @apply flex flex-col items-center justify-center gap-1 py-2 px-3
+           transition-colors duration-200 cursor-pointer;
+    color: color-mix(in srgb, var(--clr-on-variant) 70%, transparent);
+  }
+  .nav-item:hover { color: #6b38d4; }
+  .nav-item.active { color: #6b38d4; }
+
+  .sidebar-item {
+    @apply flex items-center gap-4 px-6 py-3.5 w-full text-left
+           transition-colors duration-200 cursor-pointer font-body text-base;
+    color: var(--clr-on-variant);
+  }
+  .sidebar-item:hover { background: var(--clr-secondary-ctn); }
+  .sidebar-item.active {
+    background: rgba(107,56,212,0.10);
+    color: #6b38d4;
+    font-weight: 600;
+    border-left: 4px solid #6b38d4;
+    padding-left: 20px;
+  }
+
+  .forge-checkbox {
+    @apply w-6 h-6 rounded-full border-2 border-primary flex items-center justify-center
+           transition-all duration-300 cursor-pointer flex-shrink-0;
+  }
+  .forge-checkbox:hover { background: rgba(107,56,212,0.10); }
+  .forge-checkbox.checked { @apply bg-primary border-primary; }
+  .forge-checkbox .check-icon {
+    @apply text-white text-sm opacity-0 scale-0 transition-all duration-300;
+  }
+  .forge-checkbox.checked .check-icon { @apply opacity-100 scale-100; }
+
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--clr-outline-var); border-radius: 10px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--clr-outline); }
+}
+
+@layer utilities {
+  .bg-forge-card    { background: var(--clr-white-card); }
+  .bg-forge-surface { background: var(--clr-surface); }
+  .bg-forge-low     { background: var(--clr-surface-low); }
+  .bg-forge-ctn     { background: var(--clr-surface-ctn); }
+  .text-forge       { color: var(--clr-on-surface); }
+  .text-forge-soft  { color: var(--clr-on-variant); }
+  .border-forge     { border-color: var(--clr-outline-var); }
+  .shadow-forge-card { box-shadow: var(--shadow-card); }
+  .shadow-forge-float { box-shadow: var(--shadow-float); }
+}
