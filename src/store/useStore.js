@@ -63,10 +63,11 @@ const useStore = create(
       editingTask:      null,
 
       // ── Theme ─────────────────────────────────────────────────────────────
-      toggleDarkMode: () => set((s) => {
-        applyTheme(!s.darkMode)
-        return { darkMode: !s.darkMode }
-      }),
+      toggleDarkMode: () => {
+        const newDark = !get().darkMode
+        applyTheme(newDark)
+        set({ darkMode: newDark })
+      },
       initTheme: () => applyTheme(get().darkMode),
 
       // ── Navigation ────────────────────────────────────────────────────────

@@ -56,7 +56,7 @@ export default function LoginPage() {
 
       {/* Dark mode toggle */}
       <button onClick={toggleDarkMode}
-        className="absolute top-5 right-5 w-10 h-10 rounded-xl flex items-center justify-center text-on-surface-variant transition-all"
+        className="absolute top-5 right-5 z-20 w-10 h-10 rounded-xl flex items-center justify-center text-on-surface-variant transition-all"
         style={{ background: 'var(--clr-surface-ctn)' }}
       >
         <motion.span key={darkMode ? 'sun' : 'moon'}
