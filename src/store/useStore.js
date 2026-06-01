@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
+import { scheduleTaskNotification, cancelTaskNotification } from '../utils/notifications.js'
 
 // ── Theme ────────────────────────────────────────────────────────────────────
 function applyTheme(dark) {
@@ -187,6 +188,7 @@ const useStore = create(
             tasks: s.tasks.map(t => t.id === tempId ? real : t),
             focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
           }))
+          scheduleTaskNotification(real)
           return real
         }
         return tempTask
@@ -199,9 +201,12 @@ const useStore = create(
           editingTask: s.editingTask?.id === id ? { ...s.editingTask, ...patch } : s.editingTask,
         }))
         await supabase.from('tasks').update(jsTaskToDb(patch)).eq('id', id)
+        const updatedTask = get().tasks.find(t => t.id === id)
+        if (updatedTask) scheduleTaskNotification(updatedTask)
       },
 
       deleteTask: async (id) => {
+        cancelTaskNotification(id)
         set((s) => ({
           tasks: s.tasks.filter(t => t.id !== id),
           focusTaskId: s.focusTaskId === id ? null : s.focusTaskId,
