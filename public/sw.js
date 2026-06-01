@@ -1,4 +1,4 @@
-const CACHE = 'forje-v2'
+const CACHE = 'forje-v3'
 const ASSETS_TO_CACHE = ['/']
 
 self.addEventListener('install', (event) => {

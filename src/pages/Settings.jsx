@@ -232,6 +232,7 @@ export default function Settings() {
       {/* ── Conta ── */}
       <section className="glass rounded-2xl p-6 border border-white/60 shadow-card">
         <h3 className="font-display font-semibold text-on-surface mb-4">Conta</h3>
+        <p className="text-xs text-on-surface-variant/40 text-right mb-4">v1.3.0</p>
 
         <button onClick={logout}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold
