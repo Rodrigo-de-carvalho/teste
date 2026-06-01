@@ -87,8 +87,10 @@ export default function Sidebar() {
 
               <div className="mx-6 my-4 border-t border-outline-variant/30" />
 
-              <button className="sidebar-item w-full text-left">
-                <span className="material-symbols-outlined text-[22px]">settings</span>
+              <button onClick={() => setPage('settings')}
+                className={`sidebar-item w-full text-left ${currentPage === 'settings' ? 'active' : ''}`}>
+                <span className="material-symbols-outlined text-[22px]"
+                  style={currentPage === 'settings' ? { fontVariationSettings: "'FILL' 1" } : {}}>settings</span>
                 <span>Configurações</span>
               </button>
               <button onClick={logout} className="sidebar-item w-full text-left !text-error hover:!bg-error-container/20">

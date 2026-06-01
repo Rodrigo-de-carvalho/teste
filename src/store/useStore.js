@@ -139,6 +139,19 @@ const useStore = create(
         })
       },
 
+      deleteAccount: async () => {
+        const uid = get().authUser?.id
+        if (!uid) return
+        await supabase.from('tasks').delete().eq('user_id', uid)
+        await supabase.from('user_stats').delete().eq('id', uid)
+        await supabase.auth.signOut()
+        set({
+          session: null, authUser: null, isLoggedIn: false,
+          tasks: [], focusTaskId: null, currentPage: 'login',
+          user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
+        })
+      },
+
       // ── Focus timer ───────────────────────────────────────────────────────
       addFocusTime: async (seconds) => {
         set((s) => ({

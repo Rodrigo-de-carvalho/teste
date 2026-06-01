@@ -3,7 +3,7 @@ import useStore from '../../store/useStore'
 import { todayString } from '../../utils/dates'
 
 export default function TopBar() {
-  const { setSidebarOpen, setQuickCaptureOpen, currentPage, darkMode, toggleDarkMode } = useStore()
+  const { setSidebarOpen, setQuickCaptureOpen, setPage, currentPage, darkMode, toggleDarkMode, user } = useStore()
 
   const titles = {
     dashboard: 'Dashboard',
@@ -97,9 +97,17 @@ export default function TopBar() {
         </button>
 
         {/* Avatar */}
-        <div className="w-9 h-9 rounded-full bg-primary/10 overflow-hidden ring-2 ring-primary/20 flex items-center justify-center">
-          <span className="material-symbols-outlined text-primary text-[20px]">person</span>
-        </div>
+        <button onClick={() => setPage('settings')}
+          className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary/20 flex-shrink-0 transition-all hover:ring-primary/50">
+          {user.avatar
+            ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+            : <div className="w-full h-full bg-primary flex items-center justify-center">
+                <span className="font-bold text-white text-sm">
+                  {(user.name || 'U')[0].toUpperCase()}
+                </span>
+              </div>
+          }
+        </button>
       </div>
     </header>
   )

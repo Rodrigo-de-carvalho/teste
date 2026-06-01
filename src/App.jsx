@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Inbox from './pages/Inbox'
 import Planning from './pages/Planning'
 import Insights from './pages/Insights'
+import Settings from './pages/Settings'
 import LoginPage from './pages/LoginPage'
 import AuthCallback from './pages/AuthCallback'
 import QuickCapture from './components/tasks/QuickCapture'
@@ -14,8 +15,9 @@ import TaskDetailModal from './components/tasks/TaskDetailModal'
 import XpToast from './components/ui/XpToast'
 import LevelUpModal from './components/ui/LevelUpModal'
 import InstallButton from './components/ui/InstallButton'
+import LgpdBanner from './components/ui/LgpdBanner'
 
-const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights }
+const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
 
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
@@ -126,6 +128,7 @@ export default function App() {
       <XpToast />
       <LevelUpModal />
       <InstallButton />
+      <LgpdBanner />
     </>
   )
 }
