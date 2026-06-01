@@ -13,6 +13,7 @@ import QuickCapture from './components/tasks/QuickCapture'
 import TaskDetailModal from './components/tasks/TaskDetailModal'
 import XpToast from './components/ui/XpToast'
 import LevelUpModal from './components/ui/LevelUpModal'
+import InstallButton from './components/ui/InstallButton'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights }
 
@@ -124,6 +125,7 @@ export default function App() {
       <TaskDetailModal />
       <XpToast />
       <LevelUpModal />
+      <InstallButton />
     </>
   )
 }
