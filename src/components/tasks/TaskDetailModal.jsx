@@ -39,16 +39,17 @@ export default function TaskDetailModal() {
   return (
     <AnimatePresence>
       {editingTask && (
-        <>
-          <motion.div
-            key="detail-bg"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-inverse-surface/40 backdrop-blur-sm"
-            onClick={() => { save(); setEditingTask(null) }}
-          />
+        <motion.div
+          key="detail-bg"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[80] bg-inverse-surface/40 backdrop-blur-sm"
+          onClick={() => { save(); setEditingTask(null) }}
+        />
+      )}
 
-          <motion.div
-            key="detail-panel"
+      {editingTask && (
+        <motion.div
+          key="detail-panel"
             initial={{ x: '100%', opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0 }}
@@ -228,7 +229,6 @@ export default function TaskDetailModal() {
               </button>
             </div>
           </motion.div>
-        </>
       )}
     </AnimatePresence>
   )
