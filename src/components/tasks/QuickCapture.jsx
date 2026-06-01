@@ -54,28 +54,29 @@ export default function QuickCapture() {
 
   return (
     <AnimatePresence>
+      {/* Backdrop — filho direto do AnimatePresence com key explícita */}
       {quickCaptureOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="qc-bg"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[90] bg-inverse-surface/40 backdrop-blur-sm"
-            onClick={() => setQuickCaptureOpen(false)}
-          />
+        <motion.div
+          key="qc-bg"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[90] bg-inverse-surface/40 backdrop-blur-sm"
+          onClick={() => setQuickCaptureOpen(false)}
+        />
+      )}
 
-          {/* Mobile: bottom sheet | Desktop: centered modal */}
-          <motion.div
-            key="qc-modal"
-            className="fixed z-[91] w-full
-                       bottom-0 left-0 right-0
-                       md:bottom-auto md:top-[12vh] md:left-1/2 md:-translate-x-1/2 md:max-w-lg md:px-4"
-            initial={{ opacity: 0, y: 60 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 60 }}
-            transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-          >
+      {/* Mobile: bottom sheet | Desktop: centered modal — filho direto com key explícita */}
+      {quickCaptureOpen && (
+        <motion.div
+          key="qc-modal"
+          className="fixed z-[91] w-full
+                     bottom-0 left-0 right-0
+                     md:bottom-auto md:top-[12vh] md:left-1/2 md:-translate-x-1/2 md:max-w-lg md:px-4"
+          initial={{ opacity: 0, y: 60 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 60 }}
+          transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+        >
             <div
               className="shadow-float overflow-hidden
                          rounded-t-3xl md:rounded-2xl"
@@ -206,7 +207,6 @@ export default function QuickCapture() {
               </div>
             </div>
           </motion.div>
-        </>
       )}
     </AnimatePresence>
   )
