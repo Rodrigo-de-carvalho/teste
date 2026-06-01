@@ -1,26 +1,18 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { canInstall, installApp, onInstallReady } from '../../utils/pwa'
 
 export default function InstallButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null)
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(canInstall())
 
   useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setShow(true)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    const unsub = onInstallReady(() => setShow(true))
+    return unsub
   }, [])
 
   async function handleInstall() {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    if (outcome === 'accepted') setShow(false)
-    setDeferredPrompt(null)
+    const installed = await installApp()
+    if (installed) setShow(false)
   }
 
   return (
@@ -44,12 +36,12 @@ export default function InstallButton() {
             </div>
             <div className="flex gap-2 flex-shrink-0">
               <button onClick={() => setShow(false)}
-                className="text-on-surface-variant text-xs px-2 py-1 rounded-lg transition-colors"
+                className="text-on-surface-variant text-xs px-2 py-1.5 rounded-lg transition-colors"
                 style={{ background: 'var(--clr-surface-ctn)' }}>
-                Agora não
+                Depois
               </button>
               <button onClick={handleInstall}
-                className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity">
+                className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-90">
                 Instalar
               </button>
             </div>

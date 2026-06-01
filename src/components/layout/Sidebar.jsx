@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
+import { canInstall, installApp, onInstallReady } from '../../utils/pwa'
 
 const NAV = [
   { id: 'dashboard', icon: 'bolt',             label: 'Dashboard'    },
@@ -12,6 +13,17 @@ const NAV = [
 export default function Sidebar() {
   const { sidebarOpen, setSidebarOpen, setPage, currentPage, user, getXpProgress, logout } = useStore()
   const xp = getXpProgress()
+  const [showInstall, setShowInstall] = useState(canInstall())
+
+  useEffect(() => {
+    const unsub = onInstallReady(() => setShowInstall(true))
+    return unsub
+  }, [])
+
+  async function handleInstall() {
+    const installed = await installApp()
+    if (installed) setShowInstall(false)
+  }
 
   // close on outside click / esc
   useEffect(() => {
@@ -97,6 +109,16 @@ export default function Sidebar() {
                 <span className="material-symbols-outlined text-[22px]">logout</span>
                 <span>Sair</span>
               </button>
+
+              {showInstall && (
+                <>
+                  <div className="mx-6 my-4 border-t border-outline-variant/30" />
+                  <button onClick={handleInstall} className="sidebar-item w-full text-left !text-primary">
+                    <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>install_mobile</span>
+                    <span>Instalar o Forje</span>
+                  </button>
+                </>
+              )}
             </nav>
 
             {/* XP Bar */}
