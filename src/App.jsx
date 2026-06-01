@@ -16,7 +16,6 @@ import XpToast from './components/ui/XpToast'
 import LevelUpModal from './components/ui/LevelUpModal'
 import InstallButton from './components/ui/InstallButton'
 import LgpdBanner from './components/ui/LgpdBanner'
-import UpdateBanner from './components/ui/UpdateBanner'
 import { registerSW } from './utils/swUpdate'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
@@ -112,7 +111,12 @@ export default function App() {
   if (currentPage === 'auth_callback') return <AuthCallback />
 
   // ── Login ─────────────────────────────────────────────────────────────────
-  if (currentPage === 'login') return <LoginPage />
+  if (currentPage === 'login') return (
+    <>
+      <LoginPage />
+      <LgpdBanner />
+    </>
+  )
 
   // ── App principal ─────────────────────────────────────────────────────────
   const Page = PAGES[currentPage] || Dashboard
@@ -132,7 +136,6 @@ export default function App() {
       <LevelUpModal />
       <InstallButton />
       <LgpdBanner />
-      <UpdateBanner />
     </>
   )
 }
