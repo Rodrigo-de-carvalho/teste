@@ -13,8 +13,9 @@ const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: 
 
 export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, addTask } = useStore()
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm]         = useState(EMPTY)
   const [expanded, setExpanded] = useState(false)
+  const [loading, setLoading]   = useState(false)
   const inputRef = useRef(null)
 
   // Global Ctrl+K
@@ -29,19 +30,20 @@ export default function QuickCapture() {
     return () => window.removeEventListener('keydown', handler)
   }, [setQuickCaptureOpen])
 
-  // Auto-focus
   useEffect(() => {
     if (quickCaptureOpen) {
-      setTimeout(() => inputRef.current?.focus(), 80)
+      setTimeout(() => inputRef.current?.focus(), 100)
     } else {
       setForm(EMPTY)
       setExpanded(false)
+      setLoading(false)
     }
   }, [quickCaptureOpen])
 
-  function submit() {
-    if (!form.title.trim()) return
-    addTask(form)
+  async function submit() {
+    if (!form.title.trim() || loading) return
+    setLoading(true)
+    await addTask(form)
     setQuickCaptureOpen(false)
   }
 
@@ -54,55 +56,74 @@ export default function QuickCapture() {
     <AnimatePresence>
       {quickCaptureOpen && (
         <>
+          {/* Backdrop */}
           <motion.div
             key="qc-bg"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-[90] bg-inverse-surface/30 backdrop-blur-sm"
+            className="fixed inset-0 z-[90] bg-inverse-surface/40 backdrop-blur-sm"
             onClick={() => setQuickCaptureOpen(false)}
           />
 
+          {/* Mobile: bottom sheet | Desktop: centered modal */}
           <motion.div
             key="qc-modal"
-            initial={{ opacity: 0, y: -20, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.97 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-            className="fixed top-[15vh] left-1/2 -translate-x-1/2 z-[91] w-full max-w-lg px-4"
+            className="fixed z-[91] w-full
+                       bottom-0 left-0 right-0
+                       md:bottom-auto md:top-[12vh] md:left-1/2 md:-translate-x-1/2 md:max-w-lg md:px-4"
+            initial={{ opacity: 0, y: 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 60 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 350 }}
           >
-            <div className="rounded-2xl shadow-float overflow-hidden" style={{ background: 'var(--clr-white-card)' }}>
-              {/* Main input */}
-              <div className="flex items-center gap-3 px-5 pt-5 pb-3">
-                <span className="material-symbols-outlined text-primary text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  add_task
-                </span>
+            <div
+              className="shadow-float overflow-hidden
+                         rounded-t-3xl md:rounded-2xl"
+              style={{ background: 'var(--clr-white-card)' }}
+            >
+              {/* Handle bar (mobile only) */}
+              <div className="flex justify-center pt-3 pb-1 md:hidden">
+                <div className="w-10 h-1 rounded-full bg-outline-variant" />
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center gap-3 px-5 pt-3 pb-2 md:pt-5">
+                <span className="material-symbols-outlined text-primary text-[22px]"
+                  style={{ fontVariationSettings: "'FILL' 1" }}>add_task</span>
                 <input
                   ref={inputRef}
-                  className="flex-1 text-lg font-body text-on-surface placeholder-on-surface-variant/40
-                             outline-none bg-transparent"
+                  className="flex-1 text-base md:text-lg font-body text-on-surface
+                             placeholder-on-surface-variant/40 outline-none bg-transparent"
                   placeholder="O que precisa ser feito?"
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                   onKeyDown={handleKey}
                 />
-                {form.title && (
+                {form.title ? (
                   <button onClick={() => setForm(f => ({ ...f, title: '' }))}
-                    className="text-on-surface-variant/50 hover:text-on-surface-variant transition-colors">
+                    className="w-8 h-8 flex items-center justify-center rounded-full
+                               text-on-surface-variant/50 hover:text-on-surface-variant transition-colors">
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                ) : (
+                  <button onClick={() => setQuickCaptureOpen(false)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full
+                               text-on-surface-variant/50 md:hidden">
                     <span className="material-symbols-outlined text-[18px]">close</span>
                   </button>
                 )}
               </div>
 
-              {/* Priority quick-select */}
-              <div className="flex gap-2 px-5 pb-3">
+              {/* Priority chips */}
+              <div className="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-none">
                 {PRIORITIES.map(p => (
                   <button
                     key={p.value}
                     onClick={() => setForm(f => ({ ...f, priority: p.value }))}
-                    className={`chip transition-all text-[10px]
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-label font-medium transition-all
                       ${form.priority === p.value
                         ? p.color + ' ring-2 ring-primary/40 scale-105'
-                        : 'bg-surface-container text-on-surface-variant hover:bg-secondary-container/60'
+                        : 'bg-surface-container text-on-surface-variant'
                       }`}
                   >
                     {p.label}
@@ -117,7 +138,7 @@ export default function QuickCapture() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25 }}
+                    transition={{ duration: 0.22 }}
                     className="overflow-hidden"
                   >
                     <div className="px-5 pb-3 grid grid-cols-2 gap-3">
@@ -140,7 +161,8 @@ export default function QuickCapture() {
                         onChange={e => setForm(f => ({ ...f, dueTime: e.target.value }))}
                       />
                       <textarea
-                        className="input-field text-sm resize-none col-span-2 h-20"
+                        className="input-field text-sm resize-none col-span-2"
+                        style={{ minHeight: '72px' }}
                         placeholder="Notas (opcional)"
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
@@ -151,26 +173,34 @@ export default function QuickCapture() {
               </AnimatePresence>
 
               {/* Footer */}
-              <div className="flex items-center justify-between px-5 py-4 border-t" style={{ borderColor: 'var(--clr-outline-var)' }}>
+              <div className="flex items-center justify-between px-5 py-4 border-t"
+                   style={{ borderColor: 'var(--clr-outline-var)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
                 <button
                   onClick={() => setExpanded(v => !v)}
-                  className="text-on-surface-variant text-sm font-label flex items-center gap-1 hover:text-primary transition-colors"
+                  className="text-on-surface-variant text-sm font-label flex items-center gap-1
+                             hover:text-primary transition-colors py-2"
                 >
-                  <span className="material-symbols-outlined text-[16px]">{expanded ? 'expand_less' : 'expand_more'}</span>
-                  {expanded ? 'Menos detalhes' : 'Mais detalhes'}
+                  <span className="material-symbols-outlined text-[16px]">
+                    {expanded ? 'expand_less' : 'tune'}
+                  </span>
+                  <span className="hidden sm:inline">{expanded ? 'Menos' : 'Detalhes'}</span>
                 </button>
 
                 <div className="flex gap-2">
-                  <button onClick={() => setQuickCaptureOpen(false)} className="btn-ghost py-2 px-4 text-sm">
+                  <button
+                    onClick={() => setQuickCaptureOpen(false)}
+                    className="btn-ghost py-2.5 px-4 text-sm hidden md:flex"
+                  >
                     Cancelar
                   </button>
                   <button
                     onClick={submit}
-                    disabled={!form.title.trim()}
-                    className={`btn-primary py-2 px-5 text-sm ${!form.title.trim() ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
+                    disabled={!form.title.trim() || loading}
+                    className={`btn-primary py-2.5 px-6 text-sm
+                      ${!form.title.trim() || loading ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
                   >
-                    Adicionar
-                    <kbd className="ml-1 text-white/60 text-[10px]">↵</kbd>
+                    {loading ? 'Salvando...' : 'Adicionar'}
+                    <kbd className="ml-1 text-white/60 text-[10px] hidden md:inline">↵</kbd>
                   </button>
                 </div>
               </div>
