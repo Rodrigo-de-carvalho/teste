@@ -2,13 +2,13 @@ import useStore from '../../store/useStore'
 
 const NAV = [
   { id: 'dashboard', icon: 'bolt',              label: 'Foco'    },
-  { id: 'inbox',     icon: 'inbox',              label: 'Entrada' },
+  { id: 'inbox',     icon: 'inbox',             label: 'Entrada' },
   { id: 'planning',  icon: 'calendar_view_week', label: 'Semana'  },
-  { id: 'insights',  icon: 'query_stats',        label: 'Stats'   },
+  { id: 'settings',  icon: 'account_circle',    label: 'Perfil'  },
 ]
 
 export default function BottomNav() {
-  const { currentPage, setPage, setQuickCaptureOpen } = useStore()
+  const { currentPage, setPage, setQuickCaptureOpen, user } = useStore()
 
   return (
     <nav
@@ -41,21 +41,41 @@ export default function BottomNav() {
         <span className="material-symbols-outlined text-white text-[30px]">add</span>
       </button>
 
-      {NAV.slice(2).map(({ id, icon, label }) => (
-        <button
-          key={id}
-          onClick={() => setPage(id)}
-          className={`nav-item flex-1 py-2 min-h-[56px] ${currentPage === id ? 'active' : ''}`}
+      {/* Semana */}
+      <button
+        onClick={() => setPage('planning')}
+        className={`nav-item flex-1 py-2 min-h-[56px] ${currentPage === 'planning' ? 'active' : ''}`}
+      >
+        <span
+          className="material-symbols-outlined text-[26px]"
+          style={currentPage === 'planning' ? { fontVariationSettings: "'FILL' 1" } : {}}
         >
+          calendar_view_week
+        </span>
+        <span className="text-[10px] font-label font-medium uppercase tracking-wider mt-0.5">Semana</span>
+      </button>
+
+      {/* Perfil / Settings — mostra avatar real se disponível */}
+      <button
+        onClick={() => setPage('settings')}
+        className={`nav-item flex-1 py-2 min-h-[56px] ${currentPage === 'settings' ? 'active' : ''}`}
+      >
+        {user?.avatar ? (
+          <img
+            src={user.avatar}
+            alt={user.name}
+            className={`w-7 h-7 rounded-full object-cover ${currentPage === 'settings' ? 'ring-2 ring-primary' : 'ring-1 ring-outline-variant'}`}
+          />
+        ) : (
           <span
             className="material-symbols-outlined text-[26px]"
-            style={currentPage === id ? { fontVariationSettings: "'FILL' 1" } : {}}
+            style={currentPage === 'settings' ? { fontVariationSettings: "'FILL' 1" } : {}}
           >
-            {icon}
+            account_circle
           </span>
-          <span className="text-[10px] font-label font-medium uppercase tracking-wider mt-0.5">{label}</span>
-        </button>
-      ))}
+        )}
+        <span className="text-[10px] font-label font-medium uppercase tracking-wider mt-0.5">Perfil</span>
+      </button>
     </nav>
   )
 }

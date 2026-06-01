@@ -1,15 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import useStore from '../store/useStore'
+import { canInstall, installApp, onInstallReady } from '../utils/pwa'
 
 export default function Settings() {
   const { user, darkMode, toggleDarkMode, logout, deleteAccount } = useStore()
-  const [name, setName]       = useState(user.name || '')
-  const [saving, setSaving]   = useState(false)
-  const [saved, setSaved]     = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [name, setName]             = useState(user.name || '')
+  const [saving, setSaving]         = useState(false)
+  const [saved, setSaved]           = useState(false)
+  const [deleting, setDeleting]     = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [showInstall, setShowInstall] = useState(canInstall())
+
+  useEffect(() => {
+    const unsub = onInstallReady(() => setShowInstall(true))
+    return unsub
+  }, [])
 
   const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
@@ -22,6 +29,11 @@ export default function Settings() {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleInstall() {
+    const installed = await installApp()
+    if (installed) setShowInstall(false)
   }
 
   async function handleDeleteAccount() {
@@ -92,7 +104,7 @@ export default function Settings() {
             <p className="text-on-surface-variant/60 text-xs mt-0.5">Reduz cansaço visual à noite</p>
           </div>
           <button onClick={toggleDarkMode}
-            className={`w-12 h-6 rounded-full transition-all duration-300 relative ${darkMode ? 'bg-primary' : 'bg-outline-variant'}`}>
+            className={`w-12 h-6 rounded-full transition-all duration-300 relative flex-shrink-0 ${darkMode ? 'bg-primary' : 'bg-outline-variant'}`}>
             <motion.div
               animate={{ x: darkMode ? 24 : 2 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -121,6 +133,68 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* ── Instalar o app ── */}
+      <section className="glass rounded-2xl p-6 border border-white/60 shadow-card mb-4">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>install_mobile</span>
+          <h3 className="font-display font-semibold text-on-surface">Instalar o Forje</h3>
+        </div>
+
+        {showInstall ? (
+          <div>
+            <p className="text-sm text-on-surface-variant mb-4">
+              Instale o Forje na sua tela inicial para acesso rápido, sem abrir o navegador.
+            </p>
+            <button
+              onClick={handleInstall}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-semibold
+                         transition-all hover:opacity-90 active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>download</span>
+              Instalar agora
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm text-on-surface-variant mb-4">
+              Para instalar o Forje na sua tela inicial, siga os passos abaixo:
+            </p>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--clr-surface-ctn)' }}>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-white text-xs font-bold">1</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Abra o menu do Chrome</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">Toque nos três pontos ⋮ no canto superior direito</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-white text-xs font-bold">2</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Adicionar à tela inicial</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">Selecione "Adicionar à tela inicial" ou "Instalar aplicativo"</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-white text-xs font-bold">3</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Confirmar instalação</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">Toque em "Instalar" na janela que aparecer</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-on-surface-variant/60 mt-3 text-center">
+              O Forje abrirá como app nativo, sem barra de endereço
+            </p>
+          </div>
+        )}
+      </section>
+
       {/* ── LGPD / Privacidade ── */}
       <section className="glass rounded-2xl p-6 border border-white/60 shadow-card mb-4">
         <div className="flex items-center gap-2 mb-4">
@@ -139,7 +213,7 @@ export default function Settings() {
           </p>
           <p className="flex items-start gap-2">
             <span className="material-symbols-outlined text-primary/70 text-[16px] mt-0.5 flex-shrink-0">check_circle</span>
-            Você pode solicitar a exclusão total dos seus dados a qualquer momento.
+            Você pode solicitar a exclusão total dos seus dados a qualquer momento pelo botão abaixo.
           </p>
           <p className="flex items-start gap-2">
             <span className="material-symbols-outlined text-primary/70 text-[16px] mt-0.5 flex-shrink-0">check_circle</span>
@@ -150,8 +224,8 @@ export default function Settings() {
         <div className="rounded-xl p-4 text-xs text-on-surface-variant/70 leading-relaxed"
           style={{ background: 'var(--clr-surface-ctn)' }}>
           <strong className="text-on-surface-variant">Dados coletados:</strong> nome, e-mail, foto de perfil,
-          tarefas, subtarefas, tempo de foco, XP e nível. Esses dados são usados exclusivamente
-          para funcionamento do Forje e nunca vendidos ou compartilhados.
+          tarefas, subtarefas, tempo de foco, XP e nível. Usados exclusivamente para o funcionamento do Forje
+          e nunca vendidos ou compartilhados com terceiros.
         </div>
       </section>
 
@@ -171,9 +245,9 @@ export default function Settings() {
           <button onClick={() => setConfirmDelete(true)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold
                        text-error transition-all hover:bg-error/10"
-            style={{ borderColor: 'rgba(var(--clr-error-rgb, 211,47,47), 0.3)' }}>
+            style={{ borderColor: 'rgba(211,47,47,0.3)' }}>
             <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-            Excluir minha conta e dados
+            Excluir minha conta e dados (LGPD)
           </button>
         ) : (
           <div className="rounded-xl p-4 border border-error/30" style={{ background: 'rgba(211,47,47,0.05)' }}>
