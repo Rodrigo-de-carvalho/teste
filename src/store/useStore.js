@@ -96,10 +96,20 @@ const useStore = create(
 
       initAuth: async () => {
         set({ isLoading: true })
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          await get().loadAll(session)
-        } else {
+        try {
+          const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 8000)
+          )
+          const { data: { session } } = await Promise.race([
+            supabase.auth.getSession(),
+            timeout,
+          ])
+          if (session) {
+            await get().loadAll(session)
+          } else {
+            set({ currentPage: 'login', isLoading: false })
+          }
+        } catch {
           set({ currentPage: 'login', isLoading: false })
         }
       },

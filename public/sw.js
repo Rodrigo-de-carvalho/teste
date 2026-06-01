@@ -1,8 +1,7 @@
-const CACHE = 'forje-v3'
+const CACHE = 'forje-v4'
 const ASSETS_TO_CACHE = ['/']
 
 self.addEventListener('install', (event) => {
-  // Ativa imediatamente sem esperar — garante que updates chegam na hora
   self.skipWaiting()
   event.waitUntil(
     caches.open(CACHE).then(cache => cache.addAll(ASSETS_TO_CACHE))
@@ -10,7 +9,6 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
-  // Remove caches antigos
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
@@ -32,5 +30,33 @@ self.addEventListener('fetch', (event) => {
         return res
       })
       .catch(() => caches.match(event.request))
+  )
+})
+
+// Recebe pedido de notificação enviado pelo app
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'SHOW_NOTIFICATION') return
+  const { title, body, tag } = event.data
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon:             '/icon-192.png',
+      badge:            '/icon-192.png',
+      tag,
+      renotify:         true,
+      requireInteraction: false,
+    })
+  )
+})
+
+// Abre o app ao clicar na notificação
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.includes(self.location.origin))
+      if (existing) return existing.focus()
+      return clients.openWindow('/')
+    })
   )
 })

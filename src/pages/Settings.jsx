@@ -3,6 +3,11 @@ import { motion } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import useStore from '../store/useStore'
 import { canInstall, installApp, onInstallReady } from '../utils/pwa'
+import {
+  notificationsSupported,
+  notificationPermission,
+  requestNotificationPermission,
+} from '../utils/notifications'
 
 export default function Settings() {
   const { user, darkMode, toggleDarkMode, logout, deleteAccount } = useStore()
@@ -11,12 +16,21 @@ export default function Settings() {
   const [saved, setSaved]           = useState(false)
   const [deleting, setDeleting]     = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [showInstall, setShowInstall] = useState(canInstall())
+  const [showInstall, setShowInstall]     = useState(canInstall())
+  const [notifPerm, setNotifPerm]         = useState(notificationPermission())
+  const [notifLoading, setNotifLoading]   = useState(false)
 
   useEffect(() => {
     const unsub = onInstallReady(() => setShowInstall(true))
     return unsub
   }, [])
+
+  async function handleRequestNotifications() {
+    setNotifLoading(true)
+    const granted = await requestNotificationPermission()
+    setNotifPerm(granted ? 'granted' : 'denied')
+    setNotifLoading(false)
+  }
 
   const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
@@ -132,6 +146,51 @@ export default function Settings() {
           ))}
         </div>
       </section>
+
+      {/* ── Notificações ── */}
+      {notificationsSupported() && (
+        <section className="glass rounded-2xl p-6 border border-white/60 shadow-card mb-4">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>notifications</span>
+            <h3 className="font-display font-semibold text-on-surface">Notificações</h3>
+          </div>
+
+          {notifPerm === 'granted' ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--clr-surface-ctn)' }}>
+              <span className="material-symbols-outlined text-success text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+              <div>
+                <p className="text-sm font-medium text-on-surface">Notificações ativadas</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">Você será avisado quando tarefas vencerem</p>
+              </div>
+            </div>
+          ) : notifPerm === 'denied' ? (
+            <div>
+              <div className="flex items-center gap-3 p-3 rounded-xl mb-3" style={{ background: 'rgba(186,26,26,0.08)' }}>
+                <span className="material-symbols-outlined text-error text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>notifications_off</span>
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Notificações bloqueadas</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">Para ativar, vá em Configurações do navegador → Notificações</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-on-surface-variant mb-4">
+                Receba lembretes quando suas tarefas estiverem prestes a vencer, mesmo com o app em segundo plano.
+              </p>
+              <button
+                onClick={handleRequestNotifications}
+                disabled={notifLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-semibold
+                           transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>notifications_active</span>
+                {notifLoading ? 'Aguardando...' : 'Ativar notificações'}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── Instalar o app ── */}
       <section className="glass rounded-2xl p-6 border border-white/60 shadow-card mb-4">
