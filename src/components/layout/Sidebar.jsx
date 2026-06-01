@@ -110,15 +110,16 @@ export default function Sidebar() {
                 <span>Sair</span>
               </button>
 
-              {showInstall && (
-                <>
-                  <div className="mx-6 my-4 border-t border-outline-variant/30" />
-                  <button onClick={handleInstall} className="sidebar-item w-full text-left !text-primary">
-                    <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>install_mobile</span>
-                    <span>Instalar o Forje</span>
-                  </button>
-                </>
-              )}
+              <div className="mx-6 my-4 border-t border-outline-variant/30" />
+              <button
+                onClick={showInstall ? handleInstall : () => { setPage('settings') }}
+                className="sidebar-item w-full text-left !text-primary"
+              >
+                <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  install_mobile
+                </span>
+                <span>{showInstall ? 'Instalar o Forje' : 'Instalar o app'}</span>
+              </button>
             </nav>
 
             {/* XP Bar */}

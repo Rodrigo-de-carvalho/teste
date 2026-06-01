@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import useStore from '../../store/useStore'
 
 const NAV = [
@@ -9,6 +10,17 @@ const NAV = [
 
 export default function BottomNav() {
   const { currentPage, setPage, setQuickCaptureOpen, user } = useStore()
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const handler = () => setKeyboardOpen(vv.height < window.innerHeight - 100)
+    vv.addEventListener('resize', handler)
+    return () => vv.removeEventListener('resize', handler)
+  }, [])
+
+  if (keyboardOpen) return null
 
   return (
     <nav

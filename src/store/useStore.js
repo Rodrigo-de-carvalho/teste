@@ -95,10 +95,17 @@ const useStore = create(
       },
 
       initAuth: async () => {
+        // Verifica localStorage sem network — evita loading desnecessário
+        const hasLocalSession = Object.keys(localStorage).some(k => k.includes('auth-token'))
+        if (!hasLocalSession) {
+          set({ currentPage: 'login', isLoading: false })
+          return
+        }
+
         set({ isLoading: true })
         try {
           const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 8000)
+            setTimeout(() => reject(new Error('timeout')), 6000)
           )
           const { data: { session } } = await Promise.race([
             supabase.auth.getSession(),
@@ -115,30 +122,31 @@ const useStore = create(
       },
 
       loadAll: async (session) => {
-        set({ isLoading: true })
         const meta = getUserMeta(session.user)
-        set({ session, authUser: meta, isLoggedIn: true })
 
+        // Mostra o app imediatamente — tarefas carregam em background
+        set({
+          session, authUser: meta, isLoggedIn: true,
+          user: { name: meta.name, email: meta.email, avatar: meta.avatar,
+                  xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
+          currentPage: 'dashboard',
+          isLoading: false,
+        })
+
+        // Carrega stats e tarefas em paralelo sem bloquear a UI
         try {
-          // Carrega stats e tarefas em paralelo
           const [statsRes, tasksRes] = await Promise.all([
             supabase.from('user_stats').select('*').eq('id', session.user.id).single(),
             supabase.from('tasks').select('*, subtasks(*)').eq('user_id', session.user.id).order('created_at', { ascending: false }),
           ])
-
           const stats = dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
-
-          set({
-            user: { ...meta, ...(stats || {}) },
+          set((s) => ({
+            user: { ...s.user, ...(stats || {}) },
             tasks,
             focusTaskId: stats?.focusTaskId || (tasks.find(t => !t.completed)?.id || null),
-            currentPage: 'dashboard',
-            isLoading: false,
-          })
-        } catch {
-          set({ currentPage: 'dashboard', isLoading: false })
-        }
+          }))
+        } catch { /* silently ignore — user já está na tela principal */ }
       },
 
       logout: async () => {
