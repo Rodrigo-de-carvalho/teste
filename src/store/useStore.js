@@ -90,8 +90,8 @@ const useStore = create(
           return
         }
         const meta = getUserMeta(session.user)
-        set({ session, authUser: meta, isLoggedIn: true,
-              user: (s) => ({ ...s.user, ...meta }) })
+        set((s) => ({ session, authUser: meta, isLoggedIn: true,
+              user: { ...s.user, ...meta } }))
       },
 
       initAuth: async () => {
@@ -209,12 +209,54 @@ const useStore = create(
       },
 
       updateTask: async (id, patch) => {
+        // Guarda subtarefas antigas antes do update otimista
+        const oldSubs = get().tasks.find(t => t.id === id)?.subtasks || []
+
         // Optimistic
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t),
           editingTask: s.editingTask?.id === id ? { ...s.editingTask, ...patch } : s.editingTask,
         }))
-        await supabase.from('tasks').update(jsTaskToDb(patch)).eq('id', id)
+
+        // Atualiza campos do task
+        const dbPatch = jsTaskToDb(patch)
+        if (Object.keys(dbPatch).length > 0) {
+          await supabase.from('tasks').update(dbPatch).eq('id', id)
+        }
+
+        // Sincroniza subtarefas se foram alteradas
+        if (patch.subtasks !== undefined) {
+          const newSubs = patch.subtasks
+
+          // Deleta subtarefas removidas
+          const deletedIds = oldSubs
+            .filter(o => !newSubs.some(n => n.id === o.id))
+            .map(s => s.id)
+          if (deletedIds.length > 0) {
+            await supabase.from('subtasks').delete().in('id', deletedIds)
+          }
+
+          // Insere subtarefas novas (IDs temporários são números de Date.now())
+          const addedSubs = newSubs.filter(n => !oldSubs.some(o => o.id === n.id))
+          for (const sub of addedSubs) {
+            const { data: inserted } = await supabase
+              .from('subtasks')
+              .insert({ task_id: id, title: sub.title, done: sub.done })
+              .select()
+              .single()
+            // Substitui ID temporário pelo ID real no store
+            if (inserted) {
+              set((s) => ({
+                tasks: s.tasks.map(t =>
+                  t.id === id
+                    ? { ...t, subtasks: t.subtasks.map(st => st.id === sub.id ? { ...st, id: inserted.id } : st) }
+                    : t
+                ),
+              }))
+            }
+          }
+        }
+
         const updatedTask = get().tasks.find(t => t.id === id)
         if (updatedTask) scheduleTaskNotification(updatedTask)
       },

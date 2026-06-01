@@ -96,9 +96,13 @@ export default function TopBar() {
           </motion.span>
         </button>
 
-        {/* Avatar */}
-        <button onClick={() => setPage('settings')}
-          className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary/20 flex-shrink-0 transition-all hover:ring-primary/50">
+        {/* Avatar → Configurações */}
+        <button
+          onClick={() => setPage('settings')}
+          title="Configurações e Perfil"
+          aria-label="Abrir configurações"
+          className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary/20 flex-shrink-0 transition-all hover:ring-primary/60 hover:scale-105 active:scale-95"
+        >
           {user.avatar
             ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
             : <div className="w-full h-full bg-primary flex items-center justify-center">

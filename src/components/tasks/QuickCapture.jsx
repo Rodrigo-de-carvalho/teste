@@ -79,7 +79,8 @@ export default function QuickCapture() {
         >
             <div
               className="shadow-float overflow-hidden
-                         rounded-t-3xl md:rounded-2xl"
+                         rounded-t-3xl md:rounded-2xl
+                         max-h-[90dvh] md:max-h-none flex flex-col"
               style={{ background: 'var(--clr-white-card)' }}
             >
               {/* Handle bar (mobile only) */}
@@ -116,7 +117,7 @@ export default function QuickCapture() {
               </div>
 
               {/* Priority chips */}
-              <div className="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-none">
+              <div className="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-none flex-shrink-0">
                 {PRIORITIES.map(p => (
                   <button
                     key={p.value}
@@ -140,7 +141,7 @@ export default function QuickCapture() {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.22 }}
-                    className="overflow-hidden"
+                    className="overflow-hidden overflow-y-auto"
                   >
                     <div className="px-5 pb-3 grid grid-cols-2 gap-3">
                       <input

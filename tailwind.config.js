@@ -35,6 +35,12 @@ export default {
         'inverse-surface':        'var(--clr-inverse)',
         'inverse-on-surface':     'var(--clr-inverse-on)',
         'white-card':             'var(--clr-white-card)',
+
+        // Material Design secondary tokens (fixos, não mudam com tema)
+        secondary:                '#625b71',
+        'on-secondary':           '#ffffff',
+        'secondary-on-container': '#1e192b',
+        'on-secondary-container': '#1e192b',
       },
       fontFamily: {
         display: ['Hanken Grotesk', 'sans-serif'],

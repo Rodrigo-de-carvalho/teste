@@ -185,14 +185,13 @@ export default function Dashboard() {
               </div>
               <div className="space-y-2">
                 {nextTasks.map(t => (
-                  <div key={t.id} className="relative">
+                  <div key={t.id} className="relative group">
                     <TaskCard task={t} compact />
                     {t.id !== focusTask?.id && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setFocusTask(t.id) }}
                         className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100
                                    text-xs font-label text-primary hover:underline transition-opacity hidden md:block"
-                        style={{ pointerEvents: 'none' }}
                       >
                         Focar
                       </button>

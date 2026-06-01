@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
+import { DAYS_PT } from '../../utils/dates'
 
 const PRIORITIES = ['critical','high','medium','low']
 const PRIORITY_LABELS = { critical: '🔴 Crítico', high: '🟠 Alto', medium: '🔵 Médio', low: '⚪ Baixo' }
@@ -172,6 +173,32 @@ export default function TaskDetailModal() {
                     value={form.dueTime || ''}
                     onChange={e => setForm(f => ({ ...f, dueTime: e.target.value || null }))}
                   />
+                </div>
+              </div>
+
+              {/* Dia da semana (planejamento) */}
+              <div>
+                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">
+                  Dia do Planejamento
+                </label>
+                <div className="flex gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => setForm(f => ({ ...f, weekDay: null }))}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-label font-medium transition-all
+                      ${form.weekDay === null ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant hover:bg-secondary-container'}`}
+                  >
+                    Nenhum
+                  </button>
+                  {DAYS_PT.map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setForm(f => ({ ...f, weekDay: i }))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-label font-medium transition-all
+                        ${form.weekDay === i ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant hover:bg-secondary-container'}`}
+                    >
+                      {day}
+                    </button>
+                  ))}
                 </div>
               </div>
 

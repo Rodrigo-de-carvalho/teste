@@ -89,10 +89,10 @@ export default function TaskCard({ task, compact = false }) {
         />
         <button
           onClick={(e) => { e.stopPropagation(); setEditingTask(task) }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-on-surface-variant
+          className="opacity-40 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-on-surface-variant
                      hover:text-primary w-7 h-7 flex items-center justify-center rounded"
         >
-          <span className="material-symbols-outlined text-[18px]">more_vert</span>
+          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
         </button>
       </div>
     </motion.div>
