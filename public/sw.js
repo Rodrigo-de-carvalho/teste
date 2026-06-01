@@ -1,11 +1,19 @@
 const CACHE = 'forje-v1'
 
-self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('install', () => {
+  // Do NOT call skipWaiting() here so the new SW waits for user confirmation
+  // (on first install there is no existing SW, so it activates immediately anyway)
+})
+
 self.addEventListener('activate', () => self.clients.claim())
 
-// Chrome requires a fetch handler for standalone display mode
+// The app sends this message when the user clicks "Atualizar"
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting()
+})
+
+// Network-first with cache fallback (required for PWA standalone mode)
 self.addEventListener('fetch', (event) => {
-  // Network-first: always try network, fall back to cache for same-origin requests
   if (event.request.method !== 'GET') return
   const url = new URL(event.request.url)
   if (url.origin !== self.location.origin) return

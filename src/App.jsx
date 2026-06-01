@@ -16,6 +16,8 @@ import XpToast from './components/ui/XpToast'
 import LevelUpModal from './components/ui/LevelUpModal'
 import InstallButton from './components/ui/InstallButton'
 import LgpdBanner from './components/ui/LgpdBanner'
+import UpdateBanner from './components/ui/UpdateBanner'
+import { registerSW } from './utils/swUpdate'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
 
@@ -31,6 +33,7 @@ export default function App() {
 
   // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
+    registerSW()
     initTheme()
 
     // Detecta rota /auth/callback (retorno do Google OAuth)
@@ -129,6 +132,7 @@ export default function App() {
       <LevelUpModal />
       <InstallButton />
       <LgpdBanner />
+      <UpdateBanner />
     </>
   )
 }
