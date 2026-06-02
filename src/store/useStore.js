@@ -38,6 +38,15 @@ const LOGGED_OUT_STATE = {
   user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
 }
 
+// Garante que uma promise resolva em no máximo `ms` milissegundos.
+// Se o timeout disparar primeiro, retorna { data: null, error: 'timeout' }.
+function withTimeout(promise, ms) {
+  const timer = new Promise(resolve =>
+    setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), ms)
+  )
+  return Promise.race([promise, timer])
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────────────
 const useStore = create(
   persist(
@@ -226,21 +235,26 @@ const useStore = create(
         }
         set((s) => ({ tasks: [tempTask, ...s.tasks] }))
 
-        const { data: saved, error } = await supabase
-          .from('tasks')
-          .insert({ ...jsTaskToDb(data), title: data.title.trim(), user_id: uid })
-          .select('*, subtasks(*)')
-          .single()
+        try {
+          const { data: saved, error } = await withTimeout(
+            supabase
+              .from('tasks')
+              .insert({ ...jsTaskToDb(data), title: data.title.trim(), user_id: uid })
+              .select('*, subtasks(*)')
+              .single(),
+            10000
+          )
 
-        if (!error && saved) {
-          const real = dbTaskToJs(saved)
-          set((s) => ({
-            tasks: s.tasks.map(t => t.id === tempId ? real : t),
-            focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
-          }))
-          try { scheduleTaskNotification(real) } catch {}
-          return real
-        }
+          if (!error && saved) {
+            const real = dbTaskToJs(saved)
+            set((s) => ({
+              tasks: s.tasks.map(t => t.id === tempId ? real : t),
+              focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
+            }))
+            try { scheduleTaskNotification(real) } catch {}
+            return real
+          }
+        } catch {}
         return tempTask
       },
 

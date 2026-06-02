@@ -63,6 +63,7 @@ export default function QuickCapture() {
     try {
       await addTask(form)
     } finally {
+      setLoading(false)
       setQuickCaptureOpen(false)
     }
   }
