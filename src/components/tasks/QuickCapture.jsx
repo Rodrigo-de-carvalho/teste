@@ -60,8 +60,11 @@ export default function QuickCapture() {
   async function submit() {
     if (!form.title.trim() || loading) return
     setLoading(true)
-    await addTask(form)
-    setQuickCaptureOpen(false)
+    try {
+      await addTask(form)
+    } finally {
+      setQuickCaptureOpen(false)
+    }
   }
 
   function handleKey(e) {
@@ -114,7 +117,7 @@ export default function QuickCapture() {
                   ref={inputRef}
                   className="flex-1 text-base md:text-lg font-body text-on-surface
                              placeholder-on-surface-variant/40 outline-none bg-transparent"
-                  placeholder="O que precisa ser feito?"
+                  placeholder="O que precisa ser feito? *"
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                   onKeyDown={handleKey}
@@ -133,6 +136,11 @@ export default function QuickCapture() {
                   </button>
                 )}
               </div>
+
+              {/* Required hint */}
+              <p className="px-5 pb-1 text-[11px] text-on-surface-variant/50 font-label">
+                * Obrigatório · todo o resto é opcional
+              </p>
 
               {/* Priority chips */}
               <div className="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-none flex-shrink-0">
@@ -162,31 +170,43 @@ export default function QuickCapture() {
                     className="overflow-hidden overflow-y-auto"
                   >
                     <div className="px-5 pb-3 grid grid-cols-2 gap-3">
-                      <input
-                        className="input-field text-sm"
-                        placeholder="Projeto"
-                        value={form.project}
-                        onChange={e => setForm(f => ({ ...f, project: e.target.value }))}
-                      />
-                      <input
-                        type="date"
-                        className="input-field text-sm"
-                        value={form.dueDate}
-                        onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
-                      />
-                      <input
-                        type="time"
-                        className="input-field text-sm"
-                        value={form.dueTime}
-                        onChange={e => setForm(f => ({ ...f, dueTime: e.target.value }))}
-                      />
-                      <textarea
-                        className="input-field text-sm resize-none col-span-2"
-                        style={{ minHeight: '72px' }}
-                        placeholder="Notas (opcional)"
-                        value={form.notes}
-                        onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                      />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Projeto</label>
+                        <input
+                          className="input-field text-sm"
+                          placeholder="Ex: Trabalho"
+                          value={form.project}
+                          onChange={e => setForm(f => ({ ...f, project: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Data de entrega</label>
+                        <input
+                          type="date"
+                          className="input-field text-sm"
+                          value={form.dueDate}
+                          onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Hora</label>
+                        <input
+                          type="time"
+                          className="input-field text-sm"
+                          value={form.dueTime}
+                          onChange={e => setForm(f => ({ ...f, dueTime: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1 col-span-2">
+                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Notas</label>
+                        <textarea
+                          className="input-field text-sm resize-none"
+                          style={{ minHeight: '72px' }}
+                          placeholder="Detalhes adicionais..."
+                          value={form.notes}
+                          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                        />
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -203,7 +223,7 @@ export default function QuickCapture() {
                   <span className="material-symbols-outlined text-[16px]">
                     {expanded ? 'expand_less' : 'tune'}
                   </span>
-                  <span className="hidden sm:inline">{expanded ? 'Menos' : 'Detalhes'}</span>
+                  <span className="hidden sm:inline">{expanded ? 'Menos' : 'Detalhes opcionais'}</span>
                 </button>
 
                 <div className="flex gap-2">

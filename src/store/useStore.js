@@ -197,7 +197,7 @@ const useStore = create(
             tasks: s.tasks.map(t => t.id === tempId ? real : t),
             focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
           }))
-          scheduleTaskNotification(real)
+          try { scheduleTaskNotification(real) } catch {}
           return real
         }
         return tempTask
@@ -244,7 +244,7 @@ const useStore = create(
         }
 
         const updatedTask = get().tasks.find(t => t.id === id)
-        if (updatedTask) scheduleTaskNotification(updatedTask)
+        if (updatedTask) try { scheduleTaskNotification(updatedTask) } catch {}
       },
 
       deleteTask: async (id) => {
