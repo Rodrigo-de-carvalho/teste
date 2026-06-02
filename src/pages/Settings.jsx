@@ -15,12 +15,13 @@ export default function Settings() {
   const [saving, setSaving]         = useState(false)
   const [saved, setSaved]           = useState(false)
   const [deleting, setDeleting]     = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmDelete, setConfirmDelete]   = useState(false)
   const [confirmResetXp, setConfirmResetXp] = useState(false)
   const [resettingXp, setResettingXp]       = useState(false)
-  const [showInstall, setShowInstall]     = useState(canInstall())
-  const [notifPerm, setNotifPerm]         = useState(notificationPermission())
-  const [notifLoading, setNotifLoading]   = useState(false)
+  const [resetDone, setResetDone]           = useState(false)
+  const [showInstall, setShowInstall]       = useState(canInstall())
+  const [notifPerm, setNotifPerm]           = useState(notificationPermission())
+  const [notifLoading, setNotifLoading]     = useState(false)
 
   useEffect(() => {
     const unsub = onInstallReady(() => setShowInstall(true))
@@ -60,9 +61,14 @@ export default function Settings() {
 
   async function handleResetXp() {
     setResettingXp(true)
-    await resetXp()
-    setResettingXp(false)
-    setConfirmResetXp(false)
+    try {
+      await resetXp()
+      setConfirmResetXp(false)
+      setResetDone(true)
+      setTimeout(() => setResetDone(false), 3500)
+    } finally {
+      setResettingXp(false)
+    }
   }
 
   return (
@@ -143,8 +149,8 @@ export default function Settings() {
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
             { label: 'Nível', value: user.level, icon: 'military_tech' },
-            { label: 'XP Total', value: user.xp, icon: 'bolt' },
-            { label: 'Streak', value: `${user.streak}🔥`, icon: 'local_fire_department' },
+            { label: 'XP Total', value: user.xp,   icon: 'bolt' },
+            { label: 'Streak',  value: `${user.streak}🔥`, icon: 'local_fire_department' },
           ].map(({ label, value, icon }) => (
             <div key={label} className="rounded-xl p-3 text-center" style={{ background: 'var(--clr-surface-ctn)' }}>
               <span className="material-symbols-outlined text-primary text-[20px] block mb-1"
@@ -155,8 +161,18 @@ export default function Settings() {
           ))}
         </div>
 
-        {/* Reset XP */}
-        {!confirmResetXp ? (
+        {/* Reset XP — três estados: botão / confirmação / sucesso */}
+        {resetDone ? (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
+            style={{ background: 'rgba(76,175,80,0.1)', color: 'var(--clr-success, #4caf50)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+            XP e nível resetados com sucesso!
+          </motion.div>
+        ) : !confirmResetXp ? (
           <button
             onClick={() => setConfirmResetXp(true)}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold
@@ -175,7 +191,8 @@ export default function Settings() {
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmResetXp(false)}
-                className="flex-1 py-2 rounded-xl text-sm font-semibold text-on-surface-variant transition-all"
+                disabled={resettingXp}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-on-surface-variant transition-all disabled:opacity-50"
                 style={{ background: 'var(--clr-surface-ctn)' }}
               >
                 Cancelar
