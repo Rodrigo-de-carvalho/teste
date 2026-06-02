@@ -10,12 +10,14 @@ import {
 } from '../utils/notifications'
 
 export default function Settings() {
-  const { user, darkMode, toggleDarkMode, logout, deleteAccount } = useStore()
+  const { user, darkMode, toggleDarkMode, logout, deleteAccount, resetXp } = useStore()
   const [name, setName]             = useState(user.name || '')
   const [saving, setSaving]         = useState(false)
   const [saved, setSaved]           = useState(false)
   const [deleting, setDeleting]     = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmResetXp, setConfirmResetXp] = useState(false)
+  const [resettingXp, setResettingXp]       = useState(false)
   const [showInstall, setShowInstall]     = useState(canInstall())
   const [notifPerm, setNotifPerm]         = useState(notificationPermission())
   const [notifLoading, setNotifLoading]   = useState(false)
@@ -54,6 +56,13 @@ export default function Settings() {
     setDeleting(true)
     await deleteAccount()
     setDeleting(false)
+  }
+
+  async function handleResetXp() {
+    setResettingXp(true)
+    await resetXp()
+    setResettingXp(false)
+    setConfirmResetXp(false)
   }
 
   return (
@@ -131,7 +140,7 @@ export default function Settings() {
       {/* ── Conquistas ── */}
       <section className="glass rounded-2xl p-6 border border-white/60 shadow-card mb-4">
         <h3 className="font-display font-semibold text-on-surface mb-4">Conquistas</h3>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 mb-5">
           {[
             { label: 'Nível', value: user.level, icon: 'military_tech' },
             { label: 'XP Total', value: user.xp, icon: 'bolt' },
@@ -145,6 +154,42 @@ export default function Settings() {
             </div>
           ))}
         </div>
+
+        {/* Reset XP */}
+        {!confirmResetXp ? (
+          <button
+            onClick={() => setConfirmResetXp(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold
+                       text-on-surface-variant transition-all hover:bg-secondary-container/30"
+            style={{ borderColor: 'var(--clr-outline-var)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+            Resetar XP e nível
+          </button>
+        ) : (
+          <div className="rounded-xl p-4 border border-error/30" style={{ background: 'rgba(211,47,47,0.05)' }}>
+            <p className="text-sm text-on-surface font-semibold mb-1">Resetar conquistas?</p>
+            <p className="text-xs text-on-surface-variant mb-4">
+              Seu XP e nível voltarão a zero. As tarefas não são afetadas.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmResetXp(false)}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-on-surface-variant transition-all"
+                style={{ background: 'var(--clr-surface-ctn)' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResetXp}
+                disabled={resettingXp}
+                className="flex-1 py-2 rounded-xl bg-error text-white text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-60"
+              >
+                {resettingXp ? 'Resetando...' : 'Sim, resetar'}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── Notificações ── */}

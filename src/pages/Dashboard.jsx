@@ -5,24 +5,30 @@ import ProgressRing from '../components/ui/ProgressRing'
 import TaskCard from '../components/tasks/TaskCard'
 import { formatFocusTime, todayString } from '../utils/dates'
 
-const POMODORO_MINUTES = 25
+const DURATION_OPTIONS = [15, 25, 45, 60]
 
 export default function Dashboard() {
   const {
     user, getXpProgress, getFocusTask, getActiveTasks, getCompletedToday,
-    setFocusTask, addFocusTime, tasks, setQuickCaptureOpen,
+    setFocusTask, completeFocusSession, tasks, setQuickCaptureOpen,
   } = useStore()
 
-  const xp          = getXpProgress()
-  const focusTask   = getFocusTask()
-  const active      = getActiveTasks()
-  const doneToday   = getCompletedToday()
+  const xp        = getXpProgress()
+  const focusTask = getFocusTask()
+  const active    = getActiveTasks()
+  const doneToday = getCompletedToday()
 
-  // Pomodoro timer
-  const [timerSec, setTimerSec]   = useState(POMODORO_MINUTES * 60)
-  const [running,  setRunning]    = useState(false)
-  const [sessions, setSessions]   = useState(0)
+  const [timerMinutes, setTimerMinutes] = useState(25)
+  const [timerSec, setTimerSec]         = useState(25 * 60)
+  const [running,  setRunning]          = useState(false)
+  const [sessions, setSessions]         = useState(0)
   const intervalRef = useRef(null)
+
+  function selectDuration(min) {
+    if (running) return
+    setTimerMinutes(min)
+    setTimerSec(min * 60)
+  }
 
   useEffect(() => {
     if (running) {
@@ -32,9 +38,8 @@ export default function Dashboard() {
             clearInterval(intervalRef.current)
             setRunning(false)
             setSessions(n => n + 1)
-            addFocusTime(POMODORO_MINUTES * 60)
-            setTimerSec(POMODORO_MINUTES * 60)
-            return POMODORO_MINUTES * 60
+            completeFocusSession(timerMinutes)
+            return timerMinutes * 60
           }
           return s - 1
         })
@@ -43,19 +48,17 @@ export default function Dashboard() {
       clearInterval(intervalRef.current)
     }
     return () => clearInterval(intervalRef.current)
-  }, [running, addFocusTime])
+  }, [running, completeFocusSession, timerMinutes])
 
-  function resetTimer() { setRunning(false); setTimerSec(POMODORO_MINUTES * 60) }
+  function resetTimer() { setRunning(false); setTimerSec(timerMinutes * 60) }
 
-  const totalSec = POMODORO_MINUTES * 60
-  const timerPct = Math.round(((totalSec - timerSec) / totalSec) * 100)
+  const totalSec  = timerMinutes * 60
+  const timerPct  = Math.round(((totalSec - timerSec) / totalSec) * 100)
   const mm = String(Math.floor(timerSec / 60)).padStart(2, '0')
   const ss = String(timerSec % 60).padStart(2, '0')
 
-  // Top 3 pending tasks (non-focus)
   const nextTasks = active.filter(t => t.id !== focusTask?.id).slice(0, 3)
 
-  // Projects breakdown
   const projectMap = {}
   active.forEach(t => { projectMap[t.project] = (projectMap[t.project] || 0) + 1 })
   const projects = Object.entries(projectMap).slice(0, 4)
@@ -91,7 +94,6 @@ export default function Dashboard() {
         {/* ── Focus Card (8 cols) ── */}
         <div className="lg:col-span-8 space-y-6">
           <div className="glass rounded-2xl p-6 md:p-8 border border-white/60 shadow-card relative overflow-hidden">
-            {/* bg glow */}
             <div className="absolute -right-16 -top-16 w-64 h-64 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -left-8 -bottom-8 w-48 h-48 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
 
@@ -107,9 +109,29 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <h3 className="font-display font-bold text-on-surface text-2xl md:text-3xl mb-8 leading-snug tracking-tight max-w-lg">
+                <h3 className="font-display font-bold text-on-surface text-2xl md:text-3xl mb-6 leading-snug tracking-tight max-w-lg">
                   {focusTask.title}
                 </h3>
+
+                {/* Duration selector — visível só quando parado */}
+                {!running && (
+                  <div className="flex gap-2 mb-6">
+                    <span className="text-on-surface-variant/60 text-xs font-label self-center mr-1">Duração:</span>
+                    {DURATION_OPTIONS.map(min => (
+                      <button
+                        key={min}
+                        onClick={() => selectDuration(min)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-label font-semibold transition-all
+                          ${timerMinutes === min
+                            ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                            : 'text-on-surface-variant hover:bg-secondary-container/50'
+                          }`}
+                      >
+                        {min}m
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                   {/* Timer */}
@@ -119,7 +141,7 @@ export default function Dashboard() {
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
                         <span className="font-display font-bold text-primary text-2xl leading-none">{mm}:{ss}</span>
                         <span className="text-on-surface-variant/60 text-[10px] font-label mt-0.5">
-                          {sessions > 0 ? `${sessions} sessão${sessions > 1 ? 'ões' : ''}` : 'Pomodoro'}
+                          {sessions > 0 ? `${sessions} sessão${sessions > 1 ? 'ões' : ''}` : `${timerMinutes} min`}
                         </span>
                       </div>
                     </div>
@@ -129,6 +151,11 @@ export default function Dashboard() {
                       <p className="text-on-surface-variant/60 text-xs mt-1">
                         Total hoje: {formatFocusTime(user.todayFocusSec)}
                       </p>
+                      {sessions > 0 && (
+                        <p className="text-primary/70 text-xs mt-0.5 font-label">
+                          +{timerMinutes * sessions} XP ganhos hoje no foco
+                        </p>
+                      )}
                     </div>
                   </div>
 

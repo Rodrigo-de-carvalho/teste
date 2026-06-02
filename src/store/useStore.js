@@ -107,7 +107,6 @@ const useStore = create(
       loadAll: async (session) => {
         const meta = getUserMeta(session.user)
 
-        // Mostra o app imediatamente mantendo o cache local
         set((s) => ({
           session, authUser: meta, isLoggedIn: true,
           user: { ...s.user, name: meta.name, email: meta.email, avatar: meta.avatar },
@@ -121,7 +120,6 @@ const useStore = create(
             supabase.from('tasks').select('*, subtasks(*)').eq('user_id', session.user.id).order('created_at', { ascending: false }),
           ])
 
-          // Não aplica se o usuário já saiu enquanto o fetch corria
           if (!get().isLoggedIn) return
 
           const stats = dbStatsToJs(statsRes.data)
@@ -135,8 +133,6 @@ const useStore = create(
       },
 
       logout: () => {
-        // Limpa o estado local primeiro — UI vai para login imediatamente,
-        // sem depender de rede. signOut() invalida o token no servidor em background.
         set(LOGGED_OUT_STATE)
         supabase.auth.signOut().catch(() => {})
       },
@@ -166,6 +162,47 @@ const useStore = create(
             total_focus_sec: user.totalFocusSec,
             today_focus_sec: user.todayFocusSec,
           }).eq('id', uid)
+        }
+      },
+
+      // Conclui uma sessão de foco: salva tempo + concede XP (1 XP por minuto)
+      completeFocusSession: async (minutes) => {
+        const seconds = minutes * 60
+        const xpGain  = minutes
+        const { user } = get()
+        const newXp    = user.xp + xpGain
+        const oldLevel = user.level
+        const newLevel = levelFromXp(newXp)
+
+        set((s) => ({
+          user: {
+            ...s.user,
+            xp: newXp,
+            level: newLevel,
+            totalFocusSec: s.user.totalFocusSec + seconds,
+            todayFocusSec: s.user.todayFocusSec + seconds,
+          },
+          xpToast:      { amount: xpGain, taskTitle: `${minutes} min de foco`, key: Date.now() },
+          levelUpModal: newLevel > oldLevel ? { from: oldLevel, to: newLevel } : null,
+        }))
+
+        const uid = get().authUser?.id
+        if (uid) {
+          const { user: u } = get()
+          await supabase.from('user_stats').update({
+            xp: newXp,
+            level: newLevel,
+            total_focus_sec: u.totalFocusSec,
+            today_focus_sec: u.todayFocusSec,
+          }).eq('id', uid)
+        }
+      },
+
+      resetXp: async () => {
+        set((s) => ({ user: { ...s.user, xp: 0, level: 1 } }))
+        const uid = get().authUser?.id
+        if (uid) {
+          await supabase.from('user_stats').update({ xp: 0, level: 1 }).eq('id', uid)
         }
       },
 
@@ -288,10 +325,25 @@ const useStore = create(
       },
 
       uncompleteTask: async (id) => {
+        const task = get().tasks.find(t => t.id === id)
+        if (!task || !task.completed) return
+
+        const xpLoss  = XP_TABLE[task.priority] ?? 20
+        const newXp   = Math.max(0, get().user.xp - xpLoss)
+        const newLevel = levelFromXp(newXp)
+
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, completed: false, completedAt: null } : t),
+          user:  { ...s.user, xp: newXp, level: newLevel },
         }))
-        await supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', id)
+
+        const uid = get().authUser?.id
+        if (uid) {
+          await Promise.all([
+            supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', id),
+            supabase.from('user_stats').update({ xp: newXp, level: newLevel }).eq('id', uid),
+          ])
+        }
       },
 
       // ── Subtasks ─────────────────────────────────────────────────────────────────────────
