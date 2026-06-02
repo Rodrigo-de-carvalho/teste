@@ -32,6 +32,12 @@ export function xpProgressInLevel(xp) {
   return { level, earned, needed, pct: Math.round((earned / needed) * 100) }
 }
 
+const LOGGED_OUT_STATE = {
+  session: null, authUser: null, isLoggedIn: false,
+  tasks: [], focusTaskId: null, currentPage: 'login',
+  user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────────────
 const useStore = create(
   persist(
@@ -83,12 +89,7 @@ const useStore = create(
 
       // ── Auth ──────────────────────────────────────────────────────────────────────
       setSession: (session) => {
-        if (!session) {
-          set({ session: null, authUser: null, isLoggedIn: false,
-                tasks: [], currentPage: 'login',
-                user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 } })
-          return
-        }
+        if (!session) { set(LOGGED_OUT_STATE); return }
         const meta = getUserMeta(session.user)
         set((s) => ({ session, authUser: meta, isLoggedIn: true,
               user: { ...s.user, ...meta } }))
@@ -106,9 +107,7 @@ const useStore = create(
       loadAll: async (session) => {
         const meta = getUserMeta(session.user)
 
-        // Mostra o app imediatamente mantendo o cache local (tasks + user)
-        // — não zera xp/level/streak; os valores em cache ficam visíveis
-        // enquanto os dados frescos chegam do Supabase em background.
+        // Mostra o app imediatamente mantendo o cache local
         set((s) => ({
           session, authUser: meta, isLoggedIn: true,
           user: { ...s.user, name: meta.name, email: meta.email, avatar: meta.avatar },
@@ -121,6 +120,10 @@ const useStore = create(
             supabase.from('user_stats').select('*').eq('id', session.user.id).single(),
             supabase.from('tasks').select('*, subtasks(*)').eq('user_id', session.user.id).order('created_at', { ascending: false }),
           ])
+
+          // Não aplica se o usuário já saiu enquanto o fetch corria
+          if (!get().isLoggedIn) return
+
           const stats = dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
           set((s) => ({
@@ -131,26 +134,20 @@ const useStore = create(
         } catch { /* silently ignore — usuário já está na tela principal com cache */ }
       },
 
-      logout: async () => {
-        await supabase.auth.signOut()
-        set({
-          session: null, authUser: null, isLoggedIn: false,
-          tasks: [], focusTaskId: null, currentPage: 'login',
-          user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
-        })
+      logout: () => {
+        // Limpa o estado local primeiro — UI vai para login imediatamente,
+        // sem depender de rede. signOut() invalida o token no servidor em background.
+        set(LOGGED_OUT_STATE)
+        supabase.auth.signOut().catch(() => {})
       },
 
       deleteAccount: async () => {
         const uid = get().authUser?.id
         if (!uid) return
+        set(LOGGED_OUT_STATE)
         await supabase.from('tasks').delete().eq('user_id', uid)
         await supabase.from('user_stats').delete().eq('id', uid)
-        await supabase.auth.signOut()
-        set({
-          session: null, authUser: null, isLoggedIn: false,
-          tasks: [], focusTaskId: null, currentPage: 'login',
-          user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
-        })
+        await supabase.auth.signOut().catch(() => {})
       },
 
       // ── Focus timer ───────────────────────────────────────────────────────────────────
@@ -221,14 +218,12 @@ const useStore = create(
 
         if (patch.subtasks !== undefined) {
           const newSubs = patch.subtasks
-
           const deletedIds = oldSubs
             .filter(o => !newSubs.some(n => n.id === o.id))
             .map(s => s.id)
           if (deletedIds.length > 0) {
             await supabase.from('subtasks').delete().in('id', deletedIds)
           }
-
           const addedSubs = newSubs.filter(n => !oldSubs.some(o => o.id === n.id))
           for (const sub of addedSubs) {
             const { data: inserted } = await supabase
@@ -356,8 +351,6 @@ const useStore = create(
     }),
     {
       name: 'forge-v2',
-      // Persiste tarefas e stats além das preferências — app abre instantâneo
-      // com dados da última sessão; Supabase atualiza em background.
       partialize: (s) => ({
         darkMode:    s.darkMode,
         focusTaskId: s.focusTaskId,
