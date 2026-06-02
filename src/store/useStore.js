@@ -165,14 +165,18 @@ const useStore = create(
         }
       },
 
-      // Conclui uma sessão de foco: salva tempo + concede XP (1 XP por minuto)
-      completeFocusSession: async (minutes) => {
-        const seconds = minutes * 60
-        const xpGain  = minutes
-        const { user } = get()
-        const newXp    = user.xp + xpGain
-        const oldLevel = user.level
-        const newLevel = levelFromXp(newXp)
+      // sessionStreak: quantas sessões consecutivas sem abandonar
+      // multiplicador: 1x → 1.25x → 1.5x → 1.75x → 2x (cap)
+      completeFocusSession: async (minutes, sessionStreak = 1) => {
+        const seconds    = minutes * 60
+        const multiplier = Math.min(2, 1 + (sessionStreak - 1) * 0.25)
+        const xpGain     = Math.round(minutes * multiplier)
+        const { user }   = get()
+        const newXp      = user.xp + xpGain
+        const oldLevel   = user.level
+        const newLevel   = levelFromXp(newXp)
+
+        const streakLabel = multiplier > 1 ? ` ×${multiplier.toFixed(2).replace(/\.?0+$/, '')}` : ''
 
         set((s) => ({
           user: {
@@ -182,7 +186,7 @@ const useStore = create(
             totalFocusSec: s.user.totalFocusSec + seconds,
             todayFocusSec: s.user.todayFocusSec + seconds,
           },
-          xpToast:      { amount: xpGain, taskTitle: `${minutes} min de foco`, key: Date.now() },
+          xpToast:      { amount: xpGain, taskTitle: `${minutes} min de foco${streakLabel}`, key: Date.now() },
           levelUpModal: newLevel > oldLevel ? { from: oldLevel, to: newLevel } : null,
         }))
 
@@ -328,6 +332,7 @@ const useStore = create(
         const task = get().tasks.find(t => t.id === id)
         if (!task || !task.completed) return
 
+        // Remove apenas o XP que foi ganho ao completar essa tarefa
         const xpLoss  = XP_TABLE[task.priority] ?? 20
         const newXp   = Math.max(0, get().user.xp - xpLoss)
         const newLevel = levelFromXp(newXp)
