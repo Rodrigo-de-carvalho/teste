@@ -7,17 +7,15 @@ import { formatFocusTime, todayString } from '../utils/dates'
 
 const DURATION_OPTIONS = [15, 25, 45, 60]
 
-// Estágios de temperatura da forja
 const FORGE_TEMPS = [
-  { minPct: 0,  icon: '⛔', label: 'Forja fria',       color: '#90CAF9', glow: 'rgba(144,202,249,0.3)' },
-  { minPct: 5,  icon: '🔵', label: 'Aquecendo...',     color: '#64B5F6', glow: 'rgba(100,181,246,0.3)' },
-  { minPct: 20, icon: '🟟', label: 'Esquentando!',    color: '#FFD54F', glow: 'rgba(255,213,79,0.4)'  },
-  { minPct: 45, icon: '🔶', label: 'Em brasa!',        color: '#FF8F00', glow: 'rgba(255,143,0,0.45)'  },
-  { minPct: 70, icon: '🔴', label: 'Incandescente!',  color: '#E53935', glow: 'rgba(229,57,53,0.5)'   },
-  { minPct: 88, icon: '⚡',  label: 'Branco quente!',  color: '#FFFFFF', glow: 'rgba(255,255,255,0.6)' },
+  { minPct: 0,  icon: '⛔', label: 'Forja fria',      color: '#90CAF9', glow: 'rgba(144,202,249,0.3)' },
+  { minPct: 5,  icon: '🔵', label: 'Aquecendo...',    color: '#64B5F6', glow: 'rgba(100,181,246,0.3)' },
+  { minPct: 20, icon: '🟟', label: 'Esquentando!',   color: '#FFD54F', glow: 'rgba(255,213,79,0.4)'  },
+  { minPct: 45, icon: '🔶', label: 'Em brasa!',       color: '#FF8F00', glow: 'rgba(255,143,0,0.45)'  },
+  { minPct: 70, icon: '🔴', label: 'Incandescente!', color: '#E53935', glow: 'rgba(229,57,53,0.5)'   },
+  { minPct: 88, icon: '⚡',  label: 'Branco quente!', color: '#FFFFFF', glow: 'rgba(255,255,255,0.6)' },
 ]
 
-// Graus da forja por sessões consecutivas concluídas
 const FORGE_GRADES = [
   { sessions: 0, label: 'Bruto',    badge: '⛔',  mult: 1    },
   { sessions: 1, label: 'Bronze',   badge: '🥉',  mult: 1.25 },
@@ -36,14 +34,13 @@ function getForgeGrade(sessions) {
 }
 
 function calcXp(minutes, sessions) {
-  const grade = getForgeGrade(sessions)
-  return Math.round(minutes * grade.mult)
+  return Math.round(minutes * getForgeGrade(sessions).mult)
 }
 
 export default function Dashboard() {
   const {
     user, getXpProgress, getFocusTask, getActiveTasks, getCompletedToday,
-    setFocusTask, completeFocusSession, tasks, setQuickCaptureOpen,
+    setFocusTask, completeFocusSession, setQuickCaptureOpen,
   } = useStore()
 
   const xp        = getXpProgress()
@@ -51,12 +48,13 @@ export default function Dashboard() {
   const active    = getActiveTasks()
   const doneToday = getCompletedToday()
 
-  const [timerMinutes, setTimerMinutes] = useState(25)
-  const [timerSec, setTimerSec]         = useState(25 * 60)
-  const [running,  setRunning]          = useState(false)
-  const [sessions, setSessions]         = useState(0)   // sessões concluídas consecutivas
-  const [frozenGrade, setFrozenGrade]   = useState(null) // grau exibido ao esfriar
+  const [timerMinutes, setTimerMinutes]     = useState(25)
+  const [timerSec, setTimerSec]             = useState(25 * 60)
+  const [running, setRunning]               = useState(false)
+  const [sessions, setSessions]             = useState(0)
+  const [frozenGrade, setFrozenGrade]       = useState(null)
   const [abandonWarning, setAbandonWarning] = useState(false)
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const intervalRef = useRef(null)
 
   function selectDuration(min) {
@@ -107,19 +105,27 @@ export default function Dashboard() {
     }
   }
 
+  function switchTask(id) {
+    setFocusTask(id)
+    setTaskPickerOpen(false)
+    // se estava rodando, reseta a forja para a nova tarefa
+    if (running || timerSec < timerMinutes * 60) doReset(true)
+  }
+
   const totalSec = timerMinutes * 60
   const elapsed  = totalSec - timerSec
   const timerPct = running || elapsed > 0 ? Math.round((elapsed / totalSec) * 100) : 0
   const mm = String(Math.floor(timerSec / 60)).padStart(2, '0')
   const ss = String(timerSec % 60).padStart(2, '0')
 
-  const temp          = frozenGrade ? FORGE_TEMPS[0] : getForgeTemp(timerPct)
-  const currentGrade  = getForgeGrade(sessions)
-  const nextGrade     = getForgeGrade(sessions + 1)
-  const xpPreview     = calcXp(timerMinutes, sessions + 1)
-  const isFrozen      = !!frozenGrade
+  const temp         = frozenGrade ? FORGE_TEMPS[0] : getForgeTemp(timerPct)
+  const currentGrade = getForgeGrade(sessions)
+  const nextGrade    = getForgeGrade(sessions + 1)
+  const xpPreview    = calcXp(timerMinutes, sessions + 1)
+  const isFrozen     = !!frozenGrade
 
-  const nextTasks = active.filter(t => t.id !== focusTask?.id).slice(0, 3)
+  const otherTasks = active.filter(t => t.id !== focusTask?.id)
+  const nextTasks  = otherTasks.slice(0, 3)
 
   const projectMap = {}
   active.forEach(t => { projectMap[t.project] = (projectMap[t.project] || 0) + 1 })
@@ -134,7 +140,6 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in">
-      {/* Greeting */}
       <section className="mb-10">
         <p className="font-label text-primary text-xs font-semibold tracking-[0.2em] uppercase mb-1">
           {todayString()}
@@ -152,7 +157,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-        {/* ── Focus Card (8 cols) ── */}
+        {/* ── Focus Card ── */}
         <div className="lg:col-span-8 space-y-6">
           <div
             className="rounded-2xl p-6 md:p-8 border shadow-card relative overflow-hidden transition-all duration-700"
@@ -163,7 +168,6 @@ export default function Dashboard() {
               borderColor: running ? temp.color + '55' : 'rgba(255,255,255,0.6)',
             }}
           >
-            {/* glow de fundo dinâmico */}
             <motion.div
               className="absolute -right-16 -top-16 w-64 h-64 rounded-full blur-3xl pointer-events-none"
               animate={{ background: running ? temp.glow : 'rgba(var(--clr-primary-rgb),0.06)' }}
@@ -172,6 +176,7 @@ export default function Dashboard() {
 
             {focusTask ? (
               <div className="relative z-10">
+                {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <span className="chip bg-primary/10 text-primary">Foco Principal</span>
@@ -182,7 +187,6 @@ export default function Dashboard() {
                       </>
                     )}
                   </div>
-                  {/* Grau da Forja */}
                   <motion.div
                     key={currentGrade.label}
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -199,9 +203,65 @@ export default function Dashboard() {
                   </motion.div>
                 </div>
 
-                <h3 className="font-display font-bold text-on-surface text-2xl md:text-3xl mb-5 leading-snug tracking-tight max-w-lg">
+                {/* Título da tarefa + botão de trocar */}
+                <h3 className="font-display font-bold text-on-surface text-2xl md:text-3xl mb-2 leading-snug tracking-tight max-w-lg">
                   {focusTask.title}
                 </h3>
+
+                {/* Trocar tarefa — visível em qualquer tela */}
+                {otherTasks.length > 0 && !abandonWarning && (
+                  <div className="mb-5">
+                    <button
+                      onClick={() => setTaskPickerOpen(v => !v)}
+                      className="flex items-center gap-1 text-xs font-label text-on-surface-variant/60 hover:text-primary transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                      Trocar tarefa
+                      <span className="material-symbols-outlined text-[13px]">
+                        {taskPickerOpen ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </button>
+
+                    <AnimatePresence>
+                      {taskPickerOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-2 rounded-xl overflow-hidden" style={{ background: 'var(--clr-surface-ctn)' }}>
+                            {active.map(t => (
+                              <button
+                                key={t.id}
+                                onClick={() => switchTask(t.id)}
+                                className={`w-full text-left px-4 py-3 text-sm transition-all flex items-center gap-3
+                                  border-b last:border-b-0
+                                  ${ t.id === focusTask?.id
+                                    ? 'bg-primary/10 text-primary font-semibold'
+                                    : 'text-on-surface hover:bg-secondary-container/50'
+                                  }`}
+                                style={{ borderColor: 'var(--clr-outline-var)' }}
+                              >
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0
+                                  ${t.priority === 'critical' ? 'bg-error'
+                                    : t.priority === 'high' ? 'bg-tertiary'
+                                    : 'bg-primary'}`}
+                                />
+                                <span className="truncate flex-1">{t.title}</span>
+                                {t.id === focusTask?.id
+                                  ? <span className="material-symbols-outlined text-[16px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                                  : <span className="material-symbols-outlined text-[16px] text-on-surface-variant/40">chevron_right</span>
+                                }
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
 
                 {/* Seletor de duração */}
                 {!running && !abandonWarning && (
@@ -259,7 +319,6 @@ export default function Dashboard() {
                           <p className="text-xs text-on-surface-variant mt-1">
                             Você vai perder o calor acumulado
                             {sessions > 0 && ` e o Grau ${currentGrade.label} ${currentGrade.badge}`}.
-                            O nível da forja volta para Bruto.
                           </p>
                         </div>
                       </div>
@@ -321,13 +380,17 @@ export default function Dashboard() {
                       </p>
                       {!isFrozen && (
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <span className="text-xs font-label font-semibold" style={{ color: temp.color === '#FFFFFF' ? '#bbb' : temp.color }}>
+                          <span className="text-xs font-label font-semibold"
+                            style={{ color: temp.color === '#FFFFFF' ? '#bbb' : temp.color }}>
                             +{xpPreview} XP ao concluir
                           </span>
                           {sessions > 0 && (
                             <span
                               className="text-[10px] font-label px-1.5 py-0.5 rounded-full"
-                              style={{ background: `${temp.color}20`, color: temp.color === '#FFFFFF' ? '#bbb' : temp.color }}
+                              style={{
+                                background: `${temp.color}20`,
+                                color: temp.color === '#FFFFFF' ? '#bbb' : temp.color,
+                              }}
                             >
                               ×{currentGrade.mult.toFixed(2).replace(/\.?0+$/, '')} {currentGrade.label}
                             </span>
@@ -367,7 +430,6 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Próximo grau */}
                 {!isFrozen && sessions < 5 && (
                   <p className="mt-4 text-[11px] text-on-surface-variant/50 font-label">
                     {sessions === 0
@@ -388,11 +450,30 @@ export default function Dashboard() {
                   <span className="material-symbols-outlined text-primary text-[28px]">bolt</span>
                 </div>
                 <p className="font-display font-semibold text-on-surface text-xl mb-2">Forja apagada</p>
-                <p className="text-on-surface-variant text-sm mb-6">Escolha uma tarefa para acender a forja</p>
-                <button onClick={() => setQuickCaptureOpen(true)} className="btn-primary mx-auto">
-                  <span className="material-symbols-outlined text-[18px]">add</span>
-                  Nova tarefa
-                </button>
+                <p className="text-on-surface-variant text-sm mb-6">Escolha uma tarefa abaixo para acender a forja</p>
+                {active.length > 0 ? (
+                  <div className="text-left rounded-xl overflow-hidden" style={{ background: 'var(--clr-surface-ctn)' }}>
+                    {active.slice(0, 5).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setFocusTask(t.id)}
+                        className="w-full text-left px-4 py-3 text-sm text-on-surface hover:bg-secondary-container/50
+                                   transition-all flex items-center gap-3 border-b last:border-b-0"
+                        style={{ borderColor: 'var(--clr-outline-var)' }}
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0
+                          ${t.priority === 'critical' ? 'bg-error' : t.priority === 'high' ? 'bg-tertiary' : 'bg-primary'}`} />
+                        <span className="truncate flex-1">{t.title}</span>
+                        <span className="material-symbols-outlined text-[16px] text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>whatshot</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <button onClick={() => setQuickCaptureOpen(true)} className="btn-primary mx-auto">
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    Nova tarefa
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -411,15 +492,16 @@ export default function Dashboard() {
                 {nextTasks.map(t => (
                   <div key={t.id} className="relative group">
                     <TaskCard task={t} compact />
-                    {t.id !== focusTask?.id && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setFocusTask(t.id) }}
-                        className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100
-                                   text-xs font-label text-primary hover:underline transition-opacity hidden md:block"
-                      >
-                        Focar
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); switchTask(t.id) }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2
+                                 text-xs font-label text-primary font-semibold
+                                 px-2 py-1 rounded-lg bg-primary/10
+                                 opacity-0 group-hover:opacity-100 md:opacity-100
+                                 transition-opacity"
+                    >
+                      Focar
+                    </button>
                   </div>
                 ))}
               </div>
@@ -427,22 +509,19 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ── Right Column (4 cols) ── */}
+        {/* ── Right Column ── */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Stats Card */}
           <div className="glass rounded-2xl p-6 border border-white/60 shadow-card">
             <div className="flex items-center justify-between mb-5">
               <h4 className="font-display font-semibold text-on-surface">Estado de Fluxo</h4>
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                analytics
-              </span>
+              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>analytics</span>
             </div>
             <div className="grid grid-cols-2 gap-3 mb-5">
               {[
-                { label: 'Concluídas hoje', value: doneToday.length, icon: 'task_alt' },
-                { label: 'Pendentes',       value: active.length,    icon: 'pending_actions' },
-                { label: 'Foco hoje',       value: formatFocusTime(user.todayFocusSec) || '0m', icon: 'timer' },
-                { label: 'Streak',          value: `${user.streak}🔥`, icon: 'local_fire_department' },
+                { label: 'Concluídas hoje', value: doneToday.length,                           icon: 'task_alt' },
+                { label: 'Pendentes',        value: active.length,                              icon: 'pending_actions' },
+                { label: 'Foco hoje',        value: formatFocusTime(user.todayFocusSec) || '0m', icon: 'timer' },
+                { label: 'Streak',           value: `${user.streak}🔥`,                         icon: 'local_fire_department' },
               ].map(({ label, value, icon }) => (
                 <div key={label} className="rounded-xl p-4" style={{ background: 'color-mix(in srgb, var(--clr-white-card) 80%, transparent)' }}>
                   <span className="material-symbols-outlined text-primary/70 text-[16px] mb-1 block">{icon}</span>
@@ -451,8 +530,6 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-
-            {/* XP progress */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-label text-on-surface-variant">Nível {xp.level}</span>
@@ -471,17 +548,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Projects */}
           {projects.length > 0 && (
             <div className="forge-card rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h4 className="font-label font-semibold text-on-surface-variant text-xs tracking-widest uppercase">
-                  Projetos Ativos
-                </h4>
-                <button
-                  onClick={() => setQuickCaptureOpen(true)}
-                  className="text-primary hover:bg-primary/10 w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
-                >
+                <h4 className="font-label font-semibold text-on-surface-variant text-xs tracking-widest uppercase">Projetos Ativos</h4>
+                <button onClick={() => setQuickCaptureOpen(true)}
+                  className="text-primary hover:bg-primary/10 w-7 h-7 flex items-center justify-center rounded-lg transition-colors">
                   <span className="material-symbols-outlined text-[18px]">add</span>
                 </button>
               </div>
@@ -498,35 +570,6 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-
-          {/* Focus task selector */}
-          {active.length > 1 && (
-            <div className="forge-card rounded-2xl p-6">
-              <h4 className="font-label font-semibold text-on-surface-variant text-xs tracking-widest uppercase mb-3">
-                Mudar Foco
-              </h4>
-              <div className="space-y-2">
-                {active.slice(0, 4).map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => setFocusTask(t.id)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200 flex items-center gap-2
-                      ${t.id === focusTask?.id
-                        ? 'bg-primary/10 text-primary font-semibold'
-                        : 'text-on-surface hover:bg-secondary-container/50'
-                      }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0
-                      ${t.priority === 'critical' ? 'bg-error' : t.priority === 'high' ? 'bg-tertiary' : 'bg-primary'}`} />
-                    <span className="truncate">{t.title}</span>
-                    {t.id === focusTask?.id && (
-                      <span className="material-symbols-outlined text-[14px] ml-auto" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
-                    )}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
         </div>
