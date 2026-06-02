@@ -16,7 +16,24 @@ export default function QuickCapture() {
   const [form, setForm]         = useState(EMPTY)
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading]   = useState(false)
+  const [bottomOffset, setBottomOffset] = useState(0)
   const inputRef = useRef(null)
+
+  // Empurra o modal acima do teclado virtual
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const kb = window.innerHeight - vv.height - vv.offsetTop
+      setBottomOffset(Math.max(0, kb))
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   // Global Ctrl+K
   useEffect(() => {
@@ -72,6 +89,7 @@ export default function QuickCapture() {
           className="fixed z-[91] w-full
                      bottom-0 left-0 right-0
                      md:bottom-auto md:top-[12vh] md:left-1/2 md:-translate-x-1/2 md:max-w-lg md:px-4"
+          style={{ bottom: bottomOffset }}
           initial={{ opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 60 }}
