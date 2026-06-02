@@ -56,6 +56,9 @@ export default function TaskDetailModal() {
 
   if (!form) return null
 
+  const isCompleted = editingTask?.completed
+  const noConfirm   = !confirmDelete && !confirmUncheck
+
   return (
     <AnimatePresence>
       {editingTask && (
@@ -79,7 +82,14 @@ export default function TaskDetailModal() {
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: 'var(--clr-outline-var)' }}>
-            <h3 className="font-display font-semibold text-on-surface text-lg">Detalhes</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-display font-semibold text-on-surface text-lg">Detalhes</h3>
+              {isCompleted && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-label font-semibold bg-success-container text-success">
+                  CONCLUÍDA
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setConfirmDelete(true); setConfirmUncheck(false) }}
@@ -171,21 +181,36 @@ export default function TaskDetailModal() {
             </AnimatePresence>
 
             {/* Completed toggle */}
-            {!confirmDelete && !confirmUncheck && (
+            {noConfirm && (
               <button
                 onClick={handleToggleComplete}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-all
-                  ${editingTask.completed
+                  ${isCompleted
                     ? 'bg-success-container border-success/30 text-success'
                     : 'border-outline-variant text-on-surface-variant hover:border-primary/40'}`}
               >
-                <span className="material-symbols-outlined text-[20px]" style={editingTask.completed ? { fontVariationSettings: "'FILL' 1" } : {}}>
-                  {editingTask.completed ? 'task_alt' : 'radio_button_unchecked'}
+                <span className="material-symbols-outlined text-[20px]" style={isCompleted ? { fontVariationSettings: "'FILL' 1" } : {}}>
+                  {isCompleted ? 'task_alt' : 'radio_button_unchecked'}
                 </span>
                 <span className="font-label font-medium text-sm">
-                  {editingTask.completed ? 'Concluída ✓ — toque para desmarcar' : 'Marcar como concluída'}
+                  {isCompleted ? 'Concluída ✓ — toque para desmarcar' : 'Marcar como concluída'}
                 </span>
               </button>
+            )}
+
+            {/* Banner: tarefa concluída — campos ainda editáveis */}
+            {isCompleted && noConfirm && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-primary/20"
+                style={{ background: 'rgba(var(--clr-primary-rgb, 103,80,164), 0.06)' }}
+              >
+                <span className="material-symbols-outlined text-primary text-[18px] mt-0.5" style={{ fontVariationSettings: "'FILL' 1" }}>info</span>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Esta tarefa está concluída. Você ainda pode editar os detalhes — desmarque acima para remover o XP e reativá-la.
+                </p>
+              </motion.div>
             )}
 
             {/* Title */}
