@@ -3,12 +3,12 @@ import { persist } from 'zustand/middleware'
 import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
 import { scheduleTaskNotification, cancelTaskNotification } from '../utils/notifications.js'
 
-// ── Theme ────────────────────────────────────────────────────────────────────
+// ── Theme ─────────────────────────────────────────────────────────────────────────
 function applyTheme(dark) {
   document.documentElement.classList.toggle('dark', dark)
 }
 
-// ── XP ───────────────────────────────────────────────────────────────────────
+// ── XP ─────────────────────────────────────────────────────────────────────────────
 export const XP_TABLE = { critical: 50, high: 30, medium: 20, low: 10 }
 
 function totalXpToReach(level) {
@@ -32,7 +32,7 @@ export function xpProgressInLevel(xp) {
   return { level, earned, needed, pct: Math.round((earned / needed) * 100) }
 }
 
-// ── Store ─────────────────────────────────────────────────────────────────────
+// ── Store ─────────────────────────────────────────────────────────────────────────────
 const useStore = create(
   persist(
     (set, get) => ({
@@ -62,7 +62,7 @@ const useStore = create(
       levelUpModal:     null,
       editingTask:      null,
 
-      // ── Theme ─────────────────────────────────────────────────────────────
+      // ── Theme ────────────────────────────────────────────────────────────────────
       toggleDarkMode: () => {
         const newDark = !get().darkMode
         applyTheme(newDark)
@@ -70,7 +70,7 @@ const useStore = create(
       },
       initTheme: () => applyTheme(get().darkMode),
 
-      // ── Navigation ────────────────────────────────────────────────────────
+      // ── Navigation ────────────────────────────────────────────────────────────────
       setPage:             (p)    => set({ currentPage: p, sidebarOpen: false }),
       setSidebarOpen:      (v)    => set({ sidebarOpen: v }),
       setQuickCaptureOpen: (v)    => set({ quickCaptureOpen: v }),
@@ -82,7 +82,7 @@ const useStore = create(
         if (uid) supabase.from('user_stats').update({ focus_task_id: id }).eq('id', uid)
       },
 
-      // ── Auth ──────────────────────────────────────────────────────────────
+      // ── Auth ──────────────────────────────────────────────────────────────────────
       setSession: (session) => {
         if (!session) {
           set({ session: null, authUser: null, isLoggedIn: false,
@@ -94,29 +94,13 @@ const useStore = create(
               user: { ...s.user, ...meta } }))
       },
 
+      // Mantido como utilitário; o fluxo principal de inicialização
+      // passa pelo evento INITIAL_SESSION em App.jsx
       initAuth: async () => {
-        // Verifica localStorage sem network — evita loading desnecessário
-        const hasLocalSession = Object.keys(localStorage).some(k => k.includes('auth-token'))
-        if (!hasLocalSession) {
-          set({ currentPage: 'login', isLoading: false })
-          return
-        }
-
-        set({ isLoading: true })
-        try {
-          const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 6000)
-          )
-          const { data: { session } } = await Promise.race([
-            supabase.auth.getSession(),
-            timeout,
-          ])
-          if (session) {
-            await get().loadAll(session)
-          } else {
-            set({ currentPage: 'login', isLoading: false })
-          }
-        } catch {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          await get().loadAll(session)
+        } else {
           set({ currentPage: 'login', isLoading: false })
         }
       },
@@ -146,7 +130,7 @@ const useStore = create(
             tasks,
             focusTaskId: stats?.focusTaskId || (tasks.find(t => !t.completed)?.id || null),
           }))
-        } catch { /* silently ignore — user já está na tela principal */ }
+        } catch { /* silently ignore — usuário já está na tela principal */ }
       },
 
       logout: async () => {
@@ -171,7 +155,7 @@ const useStore = create(
         })
       },
 
-      // ── Focus timer ───────────────────────────────────────────────────────
+      // ── Focus timer ───────────────────────────────────────────────────────────────────
       addFocusTime: async (seconds) => {
         set((s) => ({
           user: {
@@ -190,7 +174,7 @@ const useStore = create(
         }
       },
 
-      // ── Tasks CRUD ────────────────────────────────────────────────────────
+      // ── Tasks CRUD ────────────────────────────────────────────────────────────────────
       addTask: async (data) => {
         const uid = get().authUser?.id
         if (!uid) return
@@ -328,7 +312,7 @@ const useStore = create(
         await supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', id)
       },
 
-      // ── Subtasks ──────────────────────────────────────────────────────────
+      // ── Subtasks ─────────────────────────────────────────────────────────────────────────
       toggleSubtask: async (taskId, subId) => {
         const task = get().tasks.find(t => t.id === taskId)
         const sub  = task?.subtasks?.find(s => s.id === subId)
@@ -348,7 +332,7 @@ const useStore = create(
         await supabase.from('subtasks').update({ done }).eq('id', subId)
       },
 
-      // ── Realtime: aplica mudanças vindas de outros dispositivos ───────────
+      // ── Realtime: aplica mudanças vindas de outros dispositivos ─────────────────────
       applyRealtimeChange: (event, table, newRow, oldRow) => {
         if (table === 'tasks') {
           if (event === 'INSERT') {
@@ -372,11 +356,11 @@ const useStore = create(
         }
       },
 
-      // ── Clear helpers ─────────────────────────────────────────────────────
+      // ── Clear helpers ───────────────────────────────────────────────────────────────────
       clearXpToast:      () => set({ xpToast: null }),
       clearLevelUpModal: () => set({ levelUpModal: null }),
 
-      // ── Selectors ─────────────────────────────────────────────────────────
+      // ── Selectors ──────────────────────────────────────────────────────────────────────
       getActiveTasks:    () => get().tasks.filter(t => !t.completed),
       getCompletedToday: () => {
         const today = new Date().toDateString()

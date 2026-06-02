@@ -27,10 +27,10 @@ const pageVariants = {
 }
 
 export default function App() {
-  const { currentPage, setPage, initTheme, initAuth, loadAll, setSession, applyRealtimeChange, authUser } = useStore()
+  const { currentPage, setPage, initTheme, loadAll, setSession, applyRealtimeChange, authUser } = useStore()
   const realtimeRef = useRef(null)
 
-  // ── Init ──────────────────────────────────────────────────────────────────
+  // ── Init ────────────────────────────────────────────────────────────────
   useEffect(() => {
     registerSW()
     initTheme()
@@ -41,12 +41,17 @@ export default function App() {
       return
     }
 
-    // Inicializa auth (verifica sessão salva)
-    initAuth()
-
-    // Escuta mudanças de auth (login/logout em qualquer aba)
+    // INITIAL_SESSION é disparado na montagem lendo o localStorage — sem rede.
+    // Substitui initAuth()+timeout: o app abre imediatamente se houver sessão
+    // salva; o refresh do token acontece em background via autoRefreshToken.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      if (event === 'INITIAL_SESSION') {
+        if (session) {
+          await loadAll(session)
+        } else {
+          setPage('login')
+        }
+      } else if (event === 'SIGNED_IN' && session) {
         await loadAll(session)
       } else if (event === 'SIGNED_OUT') {
         setSession(null)
@@ -58,7 +63,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // ── Realtime: sincroniza com outros dispositivos ───────────────────────────
+  // ── Realtime: sincroniza com outros dispositivos ─────────────────────────────
   useEffect(() => {
     if (!authUser?.id) return
 
@@ -92,7 +97,7 @@ export default function App() {
     }
   }, [authUser?.id])
 
-  // ── Loading screen ────────────────────────────────────────────────────────
+  // ── Loading screen ────────────────────────────────────────────────────────────────
   if (currentPage === 'loading') {
     return (
       <div className="min-h-dvh flex items-center justify-center" style={{ background: 'var(--clr-bg)' }}>
@@ -107,10 +112,10 @@ export default function App() {
     )
   }
 
-  // ── Auth callback ─────────────────────────────────────────────────────────
+  // ── Auth callback ────────────────────────────────────────────────────────────────
   if (currentPage === 'auth_callback') return <AuthCallback />
 
-  // ── Login ─────────────────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────────────────────────
   if (currentPage === 'login') return (
     <>
       <LoginPage />
@@ -118,7 +123,7 @@ export default function App() {
     </>
   )
 
-  // ── App principal ─────────────────────────────────────────────────────────
+  // ── App principal ────────────────────────────────────────────────────────────────
   const Page = PAGES[currentPage] || Dashboard
 
   return (
