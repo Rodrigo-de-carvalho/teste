@@ -38,7 +38,7 @@ const useStore = create(
     (set, get) => ({
       // ─ Auth ─
       session:    null,
-      authUser:   null,   // { id, email, name, avatar }
+      authUser:   null,
       isLoggedIn: false,
       isLoading:  false,
 
@@ -77,7 +77,6 @@ const useStore = create(
       setEditingTask:      (task) => set({ editingTask: task }),
       setFocusTask:        (id)   => {
         set({ focusTaskId: id })
-        // Persiste no banco
         const uid = get().authUser?.id
         if (uid) supabase.from('user_stats').update({ focus_task_id: id }).eq('id', uid)
       },
@@ -86,7 +85,8 @@ const useStore = create(
       setSession: (session) => {
         if (!session) {
           set({ session: null, authUser: null, isLoggedIn: false,
-                tasks: [], currentPage: 'login', user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 } })
+                tasks: [], currentPage: 'login',
+                user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 } })
           return
         }
         const meta = getUserMeta(session.user)
@@ -94,8 +94,6 @@ const useStore = create(
               user: { ...s.user, ...meta } }))
       },
 
-      // Mantido como utilitário; o fluxo principal de inicialização
-      // passa pelo evento INITIAL_SESSION em App.jsx
       initAuth: async () => {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
@@ -108,16 +106,16 @@ const useStore = create(
       loadAll: async (session) => {
         const meta = getUserMeta(session.user)
 
-        // Mostra o app imediatamente — tarefas carregam em background
-        set({
+        // Mostra o app imediatamente mantendo o cache local (tasks + user)
+        // — não zera xp/level/streak; os valores em cache ficam visíveis
+        // enquanto os dados frescos chegam do Supabase em background.
+        set((s) => ({
           session, authUser: meta, isLoggedIn: true,
-          user: { name: meta.name, email: meta.email, avatar: meta.avatar,
-                  xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
+          user: { ...s.user, name: meta.name, email: meta.email, avatar: meta.avatar },
           currentPage: 'dashboard',
           isLoading: false,
-        })
+        }))
 
-        // Carrega stats e tarefas em paralelo sem bloquear a UI
         try {
           const [statsRes, tasksRes] = await Promise.all([
             supabase.from('user_stats').select('*').eq('id', session.user.id).single(),
@@ -130,7 +128,7 @@ const useStore = create(
             tasks,
             focusTaskId: stats?.focusTaskId || (tasks.find(t => !t.completed)?.id || null),
           }))
-        } catch { /* silently ignore — usuário já está na tela principal */ }
+        } catch { /* silently ignore — usuário já está na tela principal com cache */ }
       },
 
       logout: async () => {
@@ -179,7 +177,6 @@ const useStore = create(
         const uid = get().authUser?.id
         if (!uid) return
 
-        // Optimistic: add with temp id
         const tempId = `temp_${Date.now()}`
         const tempTask = {
           id: tempId, title: data.title.trim(), notes: data.notes || '',
@@ -191,7 +188,6 @@ const useStore = create(
         }
         set((s) => ({ tasks: [tempTask, ...s.tasks] }))
 
-        // Insert no Supabase
         const { data: saved, error } = await supabase
           .from('tasks')
           .insert({ ...jsTaskToDb(data), title: data.title.trim(), user_id: uid })
@@ -211,26 +207,21 @@ const useStore = create(
       },
 
       updateTask: async (id, patch) => {
-        // Guarda subtarefas antigas antes do update otimista
         const oldSubs = get().tasks.find(t => t.id === id)?.subtasks || []
 
-        // Optimistic
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t),
           editingTask: s.editingTask?.id === id ? { ...s.editingTask, ...patch } : s.editingTask,
         }))
 
-        // Atualiza campos do task
         const dbPatch = jsTaskToDb(patch)
         if (Object.keys(dbPatch).length > 0) {
           await supabase.from('tasks').update(dbPatch).eq('id', id)
         }
 
-        // Sincroniza subtarefas se foram alteradas
         if (patch.subtasks !== undefined) {
           const newSubs = patch.subtasks
 
-          // Deleta subtarefas removidas
           const deletedIds = oldSubs
             .filter(o => !newSubs.some(n => n.id === o.id))
             .map(s => s.id)
@@ -238,7 +229,6 @@ const useStore = create(
             await supabase.from('subtasks').delete().in('id', deletedIds)
           }
 
-          // Insere subtarefas novas (IDs temporários são números de Date.now())
           const addedSubs = newSubs.filter(n => !oldSubs.some(o => o.id === n.id))
           for (const sub of addedSubs) {
             const { data: inserted } = await supabase
@@ -246,7 +236,6 @@ const useStore = create(
               .insert({ task_id: id, title: sub.title, done: sub.done })
               .select()
               .single()
-            // Substitui ID temporário pelo ID real no store
             if (inserted) {
               set((s) => ({
                 tasks: s.tasks.map(t =>
@@ -284,7 +273,6 @@ const useStore = create(
         const newLevel = levelFromXp(newXp)
         const now      = new Date().toISOString()
 
-        // Optimistic
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, completed: true, completedAt: now } : t),
           user:  { ...s.user, xp: newXp, level: newLevel },
@@ -295,7 +283,6 @@ const useStore = create(
             : s.focusTaskId,
         }))
 
-        // Persiste
         const uid = get().authUser?.id
         if (uid) {
           await Promise.all([
@@ -332,13 +319,12 @@ const useStore = create(
         await supabase.from('subtasks').update({ done }).eq('id', subId)
       },
 
-      // ── Realtime: aplica mudanças vindas de outros dispositivos ─────────────────────
+      // ── Realtime ─────────────────────────────────────────────────────────────────────────
       applyRealtimeChange: (event, table, newRow, oldRow) => {
         if (table === 'tasks') {
           if (event === 'INSERT') {
             const task = dbTaskToJs({ ...newRow, subtasks: [] })
             set((s) => {
-              // Evita duplicar (já pode estar localmente como temp)
               const exists = s.tasks.some(t => t.id === task.id)
               if (exists) return {}
               return { tasks: [task, ...s.tasks] }
@@ -356,11 +342,10 @@ const useStore = create(
         }
       },
 
-      // ── Clear helpers ───────────────────────────────────────────────────────────────────
+      // ── Helpers ─────────────────────────────────────────────────────────────────────────
       clearXpToast:      () => set({ xpToast: null }),
       clearLevelUpModal: () => set({ levelUpModal: null }),
 
-      // ── Selectors ──────────────────────────────────────────────────────────────────────
       getActiveTasks:    () => get().tasks.filter(t => !t.completed),
       getCompletedToday: () => {
         const today = new Date().toDateString()
@@ -371,7 +356,14 @@ const useStore = create(
     }),
     {
       name: 'forge-v2',
-      partialize: (s) => ({ darkMode: s.darkMode, focusTaskId: s.focusTaskId }),
+      // Persiste tarefas e stats além das preferências — app abre instantâneo
+      // com dados da última sessão; Supabase atualiza em background.
+      partialize: (s) => ({
+        darkMode:    s.darkMode,
+        focusTaskId: s.focusTaskId,
+        tasks:       s.tasks,
+        user:        s.user,
+      }),
     }
   )
 )
