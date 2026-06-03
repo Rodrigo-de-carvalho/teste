@@ -6,7 +6,7 @@ import { canInstall, installApp, onInstallReady } from '../../utils/pwa'
 const NAV = [
   { id: 'dashboard', icon: 'bolt',             label: 'Dashboard'    },
   { id: 'inbox',     icon: 'inbox',             label: 'Entrada'      },
-  { id: 'planning',  icon: 'calendar_view_week',label: 'Planejamento' },
+  { id: 'planning',  icon: 'calendar_month',    label: 'Planejamento' },
   { id: 'insights',  icon: 'query_stats',       label: 'Insights'     },
 ]
 

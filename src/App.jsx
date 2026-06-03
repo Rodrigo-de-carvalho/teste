@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from './lib/supabase'
 import useStore from './store/useStore'
@@ -29,6 +29,15 @@ const pageVariants = {
 export default function App() {
   const { currentPage, setPage, initTheme, loadAll, setSession, applyRealtimeChange, authUser } = useStore()
   const realtimeRef = useRef(null)
+  const [offline, setOffline] = useState(!navigator.onLine)
+
+  useEffect(() => {
+    const on  = () => setOffline(false)
+    const off = () => setOffline(true)
+    window.addEventListener('online',  on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
 
   // ── Init ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -128,6 +137,19 @@ export default function App() {
 
   return (
     <>
+      <AnimatePresence>
+        {offline && (
+          <motion.div
+            key="offline-banner"
+            initial={{ y: -48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -48, opacity: 0 }}
+            className="fixed top-0 left-0 right-0 z-[200] flex items-center justify-center gap-2
+                       bg-on-surface text-surface text-xs font-label font-semibold py-2 px-4"
+          >
+            <span className="material-symbols-outlined text-[14px]">wifi_off</span>
+            Sem conexão — alterações serão salvas quando reconectar
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Layout>
         <AnimatePresence mode="wait">
           <motion.div key={currentPage} variants={pageVariants} initial="initial" animate="animate" exit="exit">

@@ -85,7 +85,7 @@ export default function Settings() {
 
         <div className="flex items-center gap-4 mb-6">
           {user.avatar ? (
-            <img src={user.avatar} alt={user.name}
+            <img src={user.avatar} alt={user.name} referrerPolicy="no-referrer"
               className="w-20 h-20 rounded-2xl object-cover ring-2 ring-primary/30 flex-shrink-0" />
           ) : (
             <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center shadow-primary-glow flex-shrink-0">

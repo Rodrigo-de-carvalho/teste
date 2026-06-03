@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
 import { scheduleTaskNotification, cancelTaskNotification } from '../utils/notifications.js'
+import { localIso } from '../utils/dates.js'
 
 // ── Theme ─────────────────────────────────────────────────────────────────────────
 function applyTheme(dark) {
@@ -146,9 +147,8 @@ const useStore = create(
           }))
 
           if (stats?.lastActiveDate) {
-            const todayStr = new Date().toISOString().split('T')[0]
             const yest = new Date(); yest.setDate(yest.getDate() - 1)
-            const yesterdayStr = yest.toISOString().split('T')[0]
+            const yesterdayStr = localIso(yest)
             if (stats.lastActiveDate < yesterdayStr) {
               set((s) => ({ user: { ...s.user, streak: 0 } }))
               supabase.from('user_stats').update({ streak: 0 }).eq('id', session.user.id).catch(() => {})
@@ -335,11 +335,10 @@ const useStore = create(
         const oldLevel = levelFromXp(user.xp)
         const newXp    = user.xp + xpGain
         const newLevel = levelFromXp(newXp)
-        const now      = new Date().toISOString()
-        const today    = now.split('T')[0]
-
-        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
-        const yesterdayStr = yesterday.toISOString().split('T')[0]
+        const now          = new Date().toISOString()
+        const today        = localIso()
+        const yesterdayD   = new Date(); yesterdayD.setDate(yesterdayD.getDate() - 1)
+        const yesterdayStr = localIso(yesterdayD)
         const newStreak = user.lastActiveDate === today ? user.streak
           : user.lastActiveDate === yesterdayStr ? user.streak + 1
           : 1

@@ -123,6 +123,7 @@ export default function QuickCapture() {
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                   onKeyDown={handleKey}
+                  maxLength={200}
                 />
                 {form.title ? (
                   <button onClick={() => setForm(f => ({ ...f, title: '' }))}
@@ -179,6 +180,7 @@ export default function QuickCapture() {
                           placeholder="Ex: Trabalho"
                           value={form.project}
                           onChange={e => setForm(f => ({ ...f, project: e.target.value }))}
+                          maxLength={100}
                         />
                       </div>
                       <div className="flex flex-col gap-1">
@@ -207,6 +209,7 @@ export default function QuickCapture() {
                           placeholder="Detalhes adicionais..."
                           value={form.notes}
                           onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                          maxLength={2000}
                         />
                       </div>
                     </div>

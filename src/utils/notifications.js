@@ -58,7 +58,7 @@ export function scheduleTaskNotification(task) {
 
   // Android nativo
   if (isAndroid()) {
-    window.Android.scheduleNotification(
+    window.Android?.scheduleNotification?.(
       task.id,
       `⚡ ${task.title}`,
       `${label} — vence agora!`,
@@ -86,7 +86,7 @@ export function scheduleTaskNotification(task) {
 
 export function cancelTaskNotification(taskId) {
   if (isAndroid()) {
-    window.Android.cancelNotification(taskId)
+    window.Android?.cancelNotification?.(taskId)
     return
   }
   const timerId = _timers.get(taskId)

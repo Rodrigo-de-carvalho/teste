@@ -1,3 +1,12 @@
+// Retorna a data local no formato YYYY-MM-DD sem converter para UTC
+export function localIso(date = new Date()) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
 export const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 export const DAYS_FULL_PT = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 export const MONTHS_PT = [
@@ -49,7 +58,7 @@ export function getWeekDays() {
       label: DAYS_PT[i],
       date: d.getDate(),
       isToday: i === dow,
-      isoDate: d.toISOString().split('T')[0],
+      isoDate: localIso(d),
     }
   })
 }
@@ -60,7 +69,7 @@ export function getLast7Days() {
     d.setDate(d.getDate() - (6 - i))
     return {
       label: DAYS_PT[d.getDay()],
-      isoDate: d.toISOString().split('T')[0],
+      isoDate: localIso(d),
     }
   })
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../store/useStore'
 import TaskCard from '../components/tasks/TaskCard'
+import { localIso } from '../utils/dates'
 
 const FILTERS = [
   { id: 'all',       label: 'Todas'       },
@@ -17,7 +18,7 @@ export default function Inbox() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = localIso()
 
   function filterTasks(t) {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false

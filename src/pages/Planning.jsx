@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
-import { DAYS_PT, MONTHS_PT } from '../utils/dates'
+import { DAYS_PT, MONTHS_PT, localIso } from '../utils/dates'
 
 const PRIORITY_COLORS = {
   critical: 'border-l-error bg-error-container/30',
@@ -17,17 +17,17 @@ function getMonthDays(year, month) {
 
   for (let i = firstDay.getDay() - 1; i >= 0; i--) {
     const d = new Date(year, month, -i)
-    days.push({ date: d, isCurrentMonth: false, iso: d.toISOString().split('T')[0] })
+    days.push({ date: d, isCurrentMonth: false, iso: localIso(d) })
   }
   for (let i = 1; i <= lastDay.getDate(); i++) {
     const d = new Date(year, month, i)
-    days.push({ date: d, isCurrentMonth: true, iso: d.toISOString().split('T')[0] })
+    days.push({ date: d, isCurrentMonth: true, iso: localIso(d) })
   }
   const remaining = days.length % 7
   if (remaining > 0) {
     for (let i = 1; i <= 7 - remaining; i++) {
       const d = new Date(year, month + 1, i)
-      days.push({ date: d, isCurrentMonth: false, iso: d.toISOString().split('T')[0] })
+      days.push({ date: d, isCurrentMonth: false, iso: localIso(d) })
     }
   }
   return days
@@ -36,7 +36,7 @@ function getMonthDays(year, month) {
 export default function Planning() {
   const { tasks, updateTask, openQuickCapture, setEditingTask } = useStore()
   const today    = new Date()
-  const todayIso = today.toISOString().split('T')[0]
+  const todayIso = localIso(today)
   const [viewYear,  setViewYear]  = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [dragging,  setDragging]  = useState(null)
