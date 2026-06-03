@@ -39,7 +39,6 @@ const LOGGED_OUT_STATE = {
 }
 
 // Garante que uma promise resolva em no máximo `ms` milissegundos.
-// Se o timeout disparar primeiro, retorna { data: null, error: 'timeout' }.
 function withTimeout(promise, ms) {
   const timer = new Promise(resolve =>
     setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), ms)
@@ -114,10 +113,14 @@ const useStore = create(
       },
 
       loadAll: async (session) => {
-        const meta = getUserMeta(session.user)
+        const meta          = getUserMeta(session.user)
+        const prevUserId    = get().authUser?.id
+        const switchingUser = prevUserId && prevUserId !== meta.id
 
         set((s) => ({
           session, authUser: meta, isLoggedIn: true,
+          // Limpa tasks em cache se for uma conta diferente da anterior
+          tasks: switchingUser ? [] : s.tasks,
           user: { ...s.user, name: meta.name, email: meta.email, avatar: meta.avatar },
           currentPage: 'dashboard',
           isLoading: false,
@@ -174,8 +177,6 @@ const useStore = create(
         }
       },
 
-      // sessionStreak: quantas sessões consecutivas sem abandonar
-      // multiplicador: 1x → 1.25x → 1.5x → 1.75x → 2x (cap)
       completeFocusSession: async (minutes, sessionStreak = 1) => {
         const seconds    = minutes * 60
         const multiplier = Math.min(2, 1 + (sessionStreak - 1) * 0.25)
@@ -346,7 +347,6 @@ const useStore = create(
         const task = get().tasks.find(t => t.id === id)
         if (!task || !task.completed) return
 
-        // Remove apenas o XP que foi ganho ao completar essa tarefa
         const xpLoss  = XP_TABLE[task.priority] ?? 20
         const newXp   = Math.max(0, get().user.xp - xpLoss)
         const newLevel = levelFromXp(newXp)
@@ -387,7 +387,14 @@ const useStore = create(
 
       // ── Realtime ─────────────────────────────────────────────────────────────────────────
       applyRealtimeChange: (event, table, newRow, oldRow) => {
+        const uid = get().authUser?.id
+        // Rejeita silenciosamente qualquer evento que não pertença ao usuário logado
+        if (!uid) return
+
         if (table === 'tasks') {
+          const rowUid = (newRow || oldRow)?.user_id
+          if (rowUid && rowUid !== uid) return
+
           if (event === 'INSERT') {
             const task = dbTaskToJs({ ...newRow, subtasks: [] })
             set((s) => {
@@ -396,13 +403,18 @@ const useStore = create(
               return { tasks: [task, ...s.tasks] }
             })
           } else if (event === 'UPDATE') {
-            const updated = dbTaskToJs({ ...newRow, subtasks: get().tasks.find(t => t.id === newRow.id)?.subtasks || [] })
+            const existing = get().tasks.find(t => t.id === newRow.id)
+            if (!existing) return
+            const updated = dbTaskToJs({ ...newRow, subtasks: existing.subtasks || [] })
             set((s) => ({ tasks: s.tasks.map(t => t.id === newRow.id ? updated : t) }))
           } else if (event === 'DELETE') {
             set((s) => ({ tasks: s.tasks.filter(t => t.id !== oldRow.id) }))
           }
         }
+
         if (table === 'user_stats' && event === 'UPDATE') {
+          // Verifica que o evento é realmente do usuário atual
+          if (newRow?.id !== uid) return
           const stats = dbStatsToJs(newRow)
           set((s) => ({ user: { ...s.user, ...stats } }))
         }
