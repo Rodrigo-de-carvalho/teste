@@ -72,8 +72,9 @@ const useStore = create(
       darkMode:         false,
       currentPage:      'loading',
       sidebarOpen:      false,
-      quickCaptureOpen: false,
-      xpToast:          null,
+      quickCaptureOpen:     false,
+      quickCaptureDefaults: null,
+      xpToast:              null,
       levelUpModal:     null,
       editingTask:      null,
 
@@ -88,7 +89,8 @@ const useStore = create(
       // ── Navigation ────────────────────────────────────────────────────────────────
       setPage:             (p)    => set({ currentPage: p, sidebarOpen: false }),
       setSidebarOpen:      (v)    => set({ sidebarOpen: v }),
-      setQuickCaptureOpen: (v)    => set({ quickCaptureOpen: v }),
+      setQuickCaptureOpen: (v)    => set({ quickCaptureOpen: v, quickCaptureDefaults: null }),
+      openQuickCapture:    (defaults = null) => set({ quickCaptureOpen: true, quickCaptureDefaults: defaults }),
       setEditingTask:      (task) => set({ editingTask: task }),
       setFocusTask:        (id)   => {
         set({ focusTaskId: id })

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
-import { DAYS_PT } from '../../utils/dates'
 
 const PRIORITIES = [
   { value: 'critical', label: '🔴 Crítico', color: 'bg-error-container text-on-error-container' },
@@ -10,10 +9,10 @@ const PRIORITIES = [
   { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
 ]
 
-const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', dueTime: '', weekDay: null }
+const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', dueTime: '' }
 
 export default function QuickCapture() {
-  const { quickCaptureOpen, setQuickCaptureOpen, addTask } = useStore()
+  const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
   const [form, setForm]         = useState(EMPTY)
   const [expanded, setExpanded] = useState(false)
   const [loading, setLoading]   = useState(false)
@@ -50,13 +49,14 @@ export default function QuickCapture() {
 
   useEffect(() => {
     if (quickCaptureOpen) {
+      setForm(quickCaptureDefaults ? { ...EMPTY, ...quickCaptureDefaults } : EMPTY)
       setTimeout(() => inputRef.current?.focus(), 100)
     } else {
       setForm(EMPTY)
       setExpanded(false)
       setLoading(false)
     }
-  }, [quickCaptureOpen])
+  }, [quickCaptureOpen, quickCaptureDefaults])
 
   async function submit() {
     if (!form.title.trim() || loading) return
@@ -208,25 +208,6 @@ export default function QuickCapture() {
                           value={form.notes}
                           onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         />
-                      </div>
-                      <div className="flex flex-col gap-1 col-span-2">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Dia da semana</label>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {DAYS_PT.map((day, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => setForm(f => ({ ...f, weekDay: f.weekDay === i ? null : i }))}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-label font-medium transition-all
-                                ${form.weekDay === i
-                                  ? 'bg-primary text-white'
-                                  : 'bg-surface-container text-on-surface-variant'
-                                }`}
-                            >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     </div>
                   </motion.div>
