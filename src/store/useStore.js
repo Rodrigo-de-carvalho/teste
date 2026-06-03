@@ -443,7 +443,6 @@ const useStore = create(
         darkMode:    s.darkMode,
         focusTaskId: s.focusTaskId,
         tasks:       s.tasks,
-        user:        s.user,
       }),
     }
   )
