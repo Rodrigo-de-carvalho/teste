@@ -47,9 +47,10 @@ function showBrowserNotification(title, body, tag) {
 
 // ── API pública ───────────────────────────────────────────────────────────────
 export function scheduleTaskNotification(task) {
-  if (!task.dueDate || !task.dueTime) return
+  if (!task.dueDate) return
 
-  const dateTime  = new Date(`${task.dueDate}T${task.dueTime}`)
+  const time     = task.dueTime || '09:00'
+  const dateTime = new Date(`${task.dueDate}T${time}`)
   const delay     = dateTime.getTime() - Date.now()
   if (isNaN(delay) || delay <= 0) return
 

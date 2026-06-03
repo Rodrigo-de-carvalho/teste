@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { version } from '../../package.json'
 import { supabase } from '../lib/supabase'
 import useStore from '../store/useStore'
 import { canInstall, installApp, onInstallReady } from '../utils/pwa'
@@ -353,7 +354,7 @@ export default function Settings() {
       {/* ── Conta ── */}
       <section className="glass rounded-2xl p-6 border border-white/60 shadow-card">
         <h3 className="font-display font-semibold text-on-surface mb-4">Conta</h3>
-        <p className="text-xs text-on-surface-variant/40 text-right mb-4">v1.3.0</p>
+        <p className="text-xs text-on-surface-variant/40 text-right mb-4">v{version}</p>
 
         <button onClick={logout}
           className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold
@@ -375,7 +376,7 @@ export default function Settings() {
           <div className="rounded-xl p-4 border border-error/30" style={{ background: 'rgba(211,47,47,0.05)' }}>
             <p className="text-sm text-on-surface font-semibold mb-1">Tem certeza?</p>
             <p className="text-xs text-on-surface-variant mb-4">
-              Isso apagará <strong>permanentemente</strong> todas as suas tarefas e dados. Não há como desfazer.
+              Seus dados e tarefas serão removidos imediatamente. O encerramento completo do acesso pode levar até 24h.
             </p>
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(false)}

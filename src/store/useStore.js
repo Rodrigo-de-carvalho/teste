@@ -142,6 +142,16 @@ const useStore = create(
             tasks,
             focusTaskId: stats?.focusTaskId || (tasks.find(t => !t.completed)?.id || null),
           }))
+
+          if (stats?.lastActiveDate) {
+            const todayStr = new Date().toISOString().split('T')[0]
+            const yest = new Date(); yest.setDate(yest.getDate() - 1)
+            const yesterdayStr = yest.toISOString().split('T')[0]
+            if (stats.lastActiveDate < yesterdayStr) {
+              set((s) => ({ user: { ...s.user, streak: 0 } }))
+              supabase.from('user_stats').update({ streak: 0 }).eq('id', session.user.id).catch(() => {})
+            }
+          }
         } catch { /* silently ignore — usuário já está na tela principal com cache */ }
       },
 
@@ -326,8 +336,11 @@ const useStore = create(
         const now      = new Date().toISOString()
         const today    = now.split('T')[0]
 
-        // Incrementa streak apenas se o último dia ativo foi diferente de hoje
-        const newStreak = user.lastActiveDate === today ? user.streak : user.streak + 1
+        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
+        const yesterdayStr = yesterday.toISOString().split('T')[0]
+        const newStreak = user.lastActiveDate === today ? user.streak
+          : user.lastActiveDate === yesterdayStr ? user.streak + 1
+          : 1
 
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, completed: true, completedAt: now } : t),

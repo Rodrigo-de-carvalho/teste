@@ -22,7 +22,7 @@ export default function Inbox() {
   function filterTasks(t) {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filter === 'all')       return !t.completed
-    if (filter === 'today')     return !t.completed && t.dueDate === today
+    if (filter === 'today')     return !t.completed && t.dueDate && t.dueDate <= today
     if (filter === 'upcoming')  return !t.completed && t.dueDate && t.dueDate > today
     if (filter === 'completed') return t.completed
     return true
@@ -36,11 +36,14 @@ export default function Inbox() {
   // Group by priority when showing all/today
   const shouldGroup = filter === 'all' || filter === 'today'
 
+  const isOverdue = (t) => t.dueDate && t.dueDate < today
+
   const groups = shouldGroup ? [
-    { key: 'critical', label: 'Foco Urgente',          dot: 'bg-error',     tasks: filtered.filter(t => t.priority === 'critical') },
-    { key: 'high',     label: 'Alta Prioridade',        dot: 'bg-tertiary',  tasks: filtered.filter(t => t.priority === 'high') },
-    { key: 'medium',   label: 'Crescimento',            dot: 'bg-primary',   tasks: filtered.filter(t => t.priority === 'medium') },
-    { key: 'low',      label: 'Quando der',             dot: 'bg-secondary', tasks: filtered.filter(t => t.priority === 'low') },
+    { key: 'overdue',  label: 'Atrasadas',              dot: 'bg-error',     tasks: filtered.filter(t => isOverdue(t)) },
+    { key: 'critical', label: 'Foco Urgente',          dot: 'bg-error',     tasks: filtered.filter(t => t.priority === 'critical' && !isOverdue(t)) },
+    { key: 'high',     label: 'Alta Prioridade',        dot: 'bg-tertiary',  tasks: filtered.filter(t => t.priority === 'high' && !isOverdue(t)) },
+    { key: 'medium',   label: 'Crescimento',            dot: 'bg-primary',   tasks: filtered.filter(t => t.priority === 'medium' && !isOverdue(t)) },
+    { key: 'low',      label: 'Quando der',             dot: 'bg-secondary', tasks: filtered.filter(t => t.priority === 'low' && !isOverdue(t)) },
   ].filter(g => g.tasks.length > 0) : null
 
   return (
@@ -157,6 +160,7 @@ export default function Inbox() {
             <div className="space-y-4">
               {[
                 { label: 'Total pendentes',  value: tasks.filter(t => !t.completed).length,  color: 'text-primary'  },
+                { label: 'Atrasadas',        value: tasks.filter(t => !t.completed && t.dueDate && t.dueDate < today).length, color: 'text-error' },
                 { label: 'Críticas',         value: tasks.filter(t => !t.completed && t.priority === 'critical').length, color: 'text-error' },
                 { label: 'Para hoje',        value: tasks.filter(t => !t.completed && t.dueDate === today).length, color: 'text-tertiary' },
                 { label: 'Concluídas hoje',  value: tasks.filter(t => t.completed && t.completedAt?.startsWith(today)).length, color: 'text-success' },
