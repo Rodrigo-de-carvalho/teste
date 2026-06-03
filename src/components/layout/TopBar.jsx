@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { todayString } from '../../utils/dates'
+import { isValidAvatarUrl } from '../../lib/supabase'
 
 export default function TopBar() {
   const { setSidebarOpen, setQuickCaptureOpen, setPage, currentPage, darkMode, toggleDarkMode, user } = useStore()
@@ -103,7 +104,7 @@ export default function TopBar() {
           aria-label="Abrir configurações"
           className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-primary/20 flex-shrink-0 transition-all hover:ring-primary/60 hover:scale-105 active:scale-95"
         >
-          {user.avatar
+          {isValidAvatarUrl(user.avatar)
             ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             : <div className="w-full h-full bg-primary flex items-center justify-center">
                 <span className="font-bold text-white text-sm">

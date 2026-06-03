@@ -16,6 +16,7 @@ import XpToast from './components/ui/XpToast'
 import LevelUpModal from './components/ui/LevelUpModal'
 import InstallButton from './components/ui/InstallButton'
 import LgpdBanner from './components/ui/LgpdBanner'
+import UpdateBanner from './components/ui/UpdateBanner'
 import { registerSW } from './utils/swUpdate'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
@@ -92,7 +93,7 @@ export default function App() {
       )
       // Stats do usuário
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'user_stats', filter: `id=eq.${authUser.id}` },
+        { event: '*', schema: 'public', table: 'user_stats', filter: `id=eq.${authUser.id}` },
         ({ eventType, new: newRow }) => {
           applyRealtimeChange(eventType, 'user_stats', newRow, null)
         }
@@ -163,6 +164,7 @@ export default function App() {
       <LevelUpModal />
       <InstallButton />
       <LgpdBanner />
+      <UpdateBanner />
     </>
   )
 }

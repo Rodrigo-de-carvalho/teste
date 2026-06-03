@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import useStore from '../../store/useStore'
+import { isValidAvatarUrl } from '../../lib/supabase'
 
 const NAV = [
   { id: 'dashboard', icon: 'bolt',              label: 'Foco'    },
@@ -72,7 +73,7 @@ export default function BottomNav() {
         onClick={() => setPage('settings')}
         className={`nav-item flex-1 py-2 min-h-[56px] ${currentPage === 'settings' ? 'active' : ''}`}
       >
-        {user?.avatar ? (
+        {isValidAvatarUrl(user?.avatar) ? (
           <img
             src={user.avatar}
             alt={user.name}

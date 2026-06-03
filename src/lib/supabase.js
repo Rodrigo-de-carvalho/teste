@@ -65,6 +65,15 @@ export function dbStatsToJs(row) {
   }
 }
 
+export function isValidAvatarUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  try {
+    return new URL(url).protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 // ── Auth helpers ──────────────────────────────────────────────────────────
 
 export async function getSession() {

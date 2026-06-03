@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { version } from '../../package.json'
-import { supabase } from '../lib/supabase'
+import { supabase, isValidAvatarUrl } from '../lib/supabase'
 import useStore from '../store/useStore'
 import { canInstall, installApp, onInstallReady } from '../utils/pwa'
 import {
@@ -42,11 +42,18 @@ export default function Settings() {
     e.preventDefault()
     if (!name.trim() || name.trim() === user.name) return
     setSaving(true)
-    await supabase.auth.updateUser({ data: { full_name: name.trim() } })
-    useStore.setState(s => ({ user: { ...s.user, name: name.trim() }, authUser: { ...s.authUser, name: name.trim() } }))
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { full_name: name.trim() } })
+      if (error) throw error
+      useStore.setState(s => ({ user: { ...s.user, name: name.trim() }, authUser: { ...s.authUser, name: name.trim() } }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      if (import.meta.env.DEV) console.error('[Forje] handleSaveName failed:', err)
+      setName(user.name || '')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleInstall() {
@@ -84,7 +91,7 @@ export default function Settings() {
         <h3 className="font-display font-semibold text-on-surface mb-5">Foto e Nome</h3>
 
         <div className="flex items-center gap-4 mb-6">
-          {user.avatar ? (
+          {isValidAvatarUrl(user.avatar) ? (
             <img src={user.avatar} alt={user.name} referrerPolicy="no-referrer"
               className="w-20 h-20 rounded-2xl object-cover ring-2 ring-primary/30 flex-shrink-0" />
           ) : (

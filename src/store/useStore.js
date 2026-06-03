@@ -96,7 +96,7 @@ const useStore = create(
       setFocusTask:        (id)   => {
         set({ focusTaskId: id })
         const uid = get().authUser?.id
-        if (uid) supabase.from('user_stats').update({ focus_task_id: id }).eq('id', uid)
+        if (uid) supabase.from('user_stats').upsert({ id: uid, focus_task_id: id })
       },
 
       // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -117,13 +117,13 @@ const useStore = create(
       },
 
       loadAll: async (session) => {
+        const expectedUid   = session.user.id
         const meta          = getUserMeta(session.user)
         const prevUserId    = get().authUser?.id
         const switchingUser = prevUserId && prevUserId !== meta.id
 
         set((s) => ({
           session, authUser: meta, isLoggedIn: true,
-          // Limpa tasks em cache se for uma conta diferente da anterior
           tasks: switchingUser ? [] : s.tasks,
           user: { ...s.user, name: meta.name, email: meta.email, avatar: meta.avatar },
           currentPage: 'dashboard',
@@ -132,11 +132,12 @@ const useStore = create(
 
         try {
           const [statsRes, tasksRes] = await Promise.all([
-            supabase.from('user_stats').select('*').eq('id', session.user.id).single(),
-            supabase.from('tasks').select('*, subtasks(*)').eq('user_id', session.user.id).order('created_at', { ascending: false }),
+            supabase.from('user_stats').select('*').eq('id', expectedUid).single(),
+            supabase.from('tasks').select('*, subtasks(*)').eq('user_id', expectedUid).order('created_at', { ascending: false }),
           ])
 
-          if (!get().isLoggedIn) return
+          // Aborta se o usuário mudou enquanto aguardávamos o Supabase
+          if (get().authUser?.id !== expectedUid) return
 
           const stats = dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
@@ -150,11 +151,15 @@ const useStore = create(
             const yest = new Date(); yest.setDate(yest.getDate() - 1)
             const yesterdayStr = localIso(yest)
             if (stats.lastActiveDate < yesterdayStr) {
-              set((s) => ({ user: { ...s.user, streak: 0 } }))
-              supabase.from('user_stats').update({ streak: 0 }).eq('id', session.user.id).catch(() => {})
+              set((s) => ({ user: { ...s.user, streak: 0, todayFocusSec: 0 } }))
+              supabase.from('user_stats')
+                .upsert({ id: expectedUid, streak: 0, today_focus_sec: 0 })
+                .catch(() => {})
             }
           }
-        } catch { /* silently ignore — usuário já está na tela principal com cache */ }
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] loadAll failed:', err)
+        }
       },
 
       logout: () => {
@@ -166,8 +171,14 @@ const useStore = create(
         const uid = get().authUser?.id
         if (!uid) return
         set(LOGGED_OUT_STATE)
-        await supabase.from('tasks').delete().eq('user_id', uid)
-        await supabase.from('user_stats').delete().eq('id', uid)
+        try {
+          await Promise.all([
+            supabase.from('tasks').delete().eq('user_id', uid),
+            supabase.from('user_stats').delete().eq('id', uid),
+          ])
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] deleteAccount failed:', err)
+        }
         await supabase.auth.signOut().catch(() => {})
       },
 
@@ -183,10 +194,11 @@ const useStore = create(
         const uid = get().authUser?.id
         if (uid) {
           const { user } = get()
-          await supabase.from('user_stats').update({
+          await supabase.from('user_stats').upsert({
+            id: uid,
             total_focus_sec: user.totalFocusSec,
             today_focus_sec: user.todayFocusSec,
-          }).eq('id', uid)
+          })
         }
       },
 
@@ -216,12 +228,13 @@ const useStore = create(
         const uid = get().authUser?.id
         if (uid) {
           const { user: u } = get()
-          await supabase.from('user_stats').update({
+          await supabase.from('user_stats').upsert({
+            id: uid,
             xp: newXp,
             level: newLevel,
             total_focus_sec: u.totalFocusSec,
             today_focus_sec: u.todayFocusSec,
-          }).eq('id', uid)
+          })
         }
       },
 
@@ -229,7 +242,7 @@ const useStore = create(
         set((s) => ({ user: { ...s.user, xp: 0, level: 1 } }))
         const uid = get().authUser?.id
         if (uid) {
-          await supabase.from('user_stats').update({ xp: 0, level: 1 }).eq('id', uid)
+          await supabase.from('user_stats').upsert({ id: uid, xp: 0, level: 1 })
         }
       },
 
@@ -273,57 +286,76 @@ const useStore = create(
       },
 
       updateTask: async (id, patch) => {
-        const oldSubs = get().tasks.find(t => t.id === id)?.subtasks || []
+        const original = get().tasks.find(t => t.id === id)
+        const oldSubs  = original?.subtasks || []
 
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t),
           editingTask: s.editingTask?.id === id ? { ...s.editingTask, ...patch } : s.editingTask,
         }))
 
-        const dbPatch = jsTaskToDb(patch)
-        if (Object.keys(dbPatch).length > 0) {
-          await supabase.from('tasks').update(dbPatch).eq('id', id)
-        }
-
-        if (patch.subtasks !== undefined) {
-          const newSubs = patch.subtasks
-          const deletedIds = oldSubs
-            .filter(o => !newSubs.some(n => n.id === o.id))
-            .map(s => s.id)
-          if (deletedIds.length > 0) {
-            await supabase.from('subtasks').delete().in('id', deletedIds)
+        try {
+          const dbPatch = jsTaskToDb(patch)
+          if (Object.keys(dbPatch).length > 0) {
+            await supabase.from('tasks').update(dbPatch).eq('id', id)
           }
-          const addedSubs = newSubs.filter(n => !oldSubs.some(o => o.id === n.id))
-          for (const sub of addedSubs) {
-            const { data: inserted } = await supabase
-              .from('subtasks')
-              .insert({ task_id: id, title: sub.title, done: sub.done })
-              .select()
-              .single()
-            if (inserted) {
-              set((s) => ({
-                tasks: s.tasks.map(t =>
-                  t.id === id
-                    ? { ...t, subtasks: t.subtasks.map(st => st.id === sub.id ? { ...st, id: inserted.id } : st) }
-                    : t
-                ),
-              }))
+
+          if (patch.subtasks !== undefined) {
+            const newSubs = patch.subtasks
+            const deletedIds = oldSubs
+              .filter(o => !newSubs.some(n => n.id === o.id))
+              .map(s => s.id)
+            if (deletedIds.length > 0) {
+              await supabase.from('subtasks').delete().in('id', deletedIds)
+            }
+            const addedSubs = newSubs.filter(n => !oldSubs.some(o => o.id === n.id))
+            for (const sub of addedSubs) {
+              const { data: inserted } = await supabase
+                .from('subtasks')
+                .insert({ task_id: id, title: sub.title, done: sub.done })
+                .select()
+                .single()
+              if (inserted) {
+                set((s) => ({
+                  tasks: s.tasks.map(t =>
+                    t.id === id
+                      ? { ...t, subtasks: t.subtasks.map(st => st.id === sub.id ? { ...st, id: inserted.id } : st) }
+                      : t
+                  ),
+                }))
+              }
             }
           }
-        }
 
-        const updatedTask = get().tasks.find(t => t.id === id)
-        if (updatedTask) try { scheduleTaskNotification(updatedTask) } catch {}
+          const updatedTask = get().tasks.find(t => t.id === id)
+          if (updatedTask) try { scheduleTaskNotification(updatedTask) } catch {}
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] updateTask failed:', err)
+          if (original) {
+            set((s) => ({
+              tasks: s.tasks.map(t => t.id === id ? original : t),
+              editingTask: s.editingTask?.id === id ? original : s.editingTask,
+            }))
+          }
+        }
       },
 
       deleteTask: async (id) => {
+        const backup = get().tasks.find(t => t.id === id)
         cancelTaskNotification(id)
         set((s) => ({
           tasks: s.tasks.filter(t => t.id !== id),
           focusTaskId: s.focusTaskId === id ? null : s.focusTaskId,
           editingTask: s.editingTask?.id === id ? null : s.editingTask,
         }))
-        await supabase.from('tasks').delete().eq('id', id)
+        try {
+          await supabase.from('tasks').delete().eq('id', id)
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] deleteTask failed:', err)
+          if (backup) {
+            set((s) => ({ tasks: [backup, ...s.tasks] }))
+          }
+        }
       },
 
       completeTask: async (id) => {
@@ -357,7 +389,7 @@ const useStore = create(
         if (uid) {
           await Promise.all([
             supabase.from('tasks').update({ completed: true, completed_at: now }).eq('id', id),
-            supabase.from('user_stats').update({ xp: newXp, level: newLevel, streak: newStreak, last_active_date: today }).eq('id', uid),
+            supabase.from('user_stats').upsert({ id: uid, xp: newXp, level: newLevel, streak: newStreak, last_active_date: today }),
           ])
         }
       },
@@ -379,7 +411,7 @@ const useStore = create(
         if (uid) {
           await Promise.all([
             supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', id),
-            supabase.from('user_stats').update({ xp: newXp, level: newLevel }).eq('id', uid),
+            supabase.from('user_stats').upsert({ id: uid, xp: newXp, level: newLevel }),
           ])
         }
       },
@@ -431,8 +463,7 @@ const useStore = create(
           }
         }
 
-        if (table === 'user_stats' && event === 'UPDATE') {
-          // Verifica que o evento é realmente do usuário atual
+        if (table === 'user_stats' && (event === 'UPDATE' || event === 'INSERT')) {
           if (newRow?.id !== uid) return
           const stats = dbStatsToJs(newRow)
           set((s) => ({ user: { ...s.user, ...stats } }))
@@ -446,7 +477,7 @@ const useStore = create(
       getActiveTasks:    () => get().tasks.filter(t => !t.completed),
       getCompletedToday: () => {
         const today = new Date().toDateString()
-        return get().tasks.filter(t => t.completed && new Date(t.completedAt).toDateString() === today)
+        return get().tasks.filter(t => t.completed && t.completedAt && new Date(t.completedAt).toDateString() === today)
       },
       getFocusTask:  () => get().tasks.find(t => t.id === get().focusTaskId) || null,
       getXpProgress: () => xpProgressInLevel(get().user.xp),
