@@ -103,9 +103,7 @@ export default function Planning() {
 
               {/* Add button */}
               <button
-                onClick={() => {
-                  useStore.getState().setQuickCaptureOpen(true)
-                }}
+                onClick={() => setQuickCaptureOpen(true)}
                 className="mt-2 w-full flex items-center justify-center gap-1 py-1.5 rounded-lg
                            text-on-surface-variant/40 hover:text-primary hover:bg-primary/5
                            transition-colors text-xs font-label"

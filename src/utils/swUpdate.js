@@ -1,7 +1,7 @@
 export function registerSW() {
   if (!('serviceWorker' in navigator)) return
 
-  navigator.serviceWorker.register('/sw.js')
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
 
   // Quando um novo SW assume o controle, recarrega a página silenciosamente
   // para garantir que o usuário sempre vê a versão mais nova

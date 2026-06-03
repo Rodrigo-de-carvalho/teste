@@ -33,7 +33,16 @@ export default function LoginPage() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
       if (error) {
-        setMessage({ type: 'error', text: error.message })
+        const msg = error.message?.toLowerCase() || ''
+        let text = 'Erro ao criar conta. Tente novamente.'
+        if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already')) {
+          text = 'Este email já está cadastrado. Tente fazer login.'
+        } else if (msg.includes('password') || msg.includes('weak') || msg.includes('characters')) {
+          text = 'Senha fraca. Use pelo menos 6 caracteres.'
+        } else if (msg.includes('invalid') && msg.includes('email')) {
+          text = 'Email inválido. Verifique e tente novamente.'
+        }
+        setMessage({ type: 'error', text })
       } else {
         setMessage({ type: 'success', text: 'Verifique seu email para confirmar o cadastro! 📬' })
       }

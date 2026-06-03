@@ -35,7 +35,7 @@ export function xpProgressInLevel(xp) {
 const LOGGED_OUT_STATE = {
   session: null, authUser: null, isLoggedIn: false,
   tasks: [], focusTaskId: null, currentPage: 'login',
-  user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0 },
+  user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0, lastActiveDate: null },
 }
 
 // Garante que uma promise resolva em no máximo `ms` milissegundos.
@@ -61,6 +61,7 @@ const useStore = create(
         name: 'Visitante', email: null, avatar: null,
         xp: 0, level: 1, streak: 0,
         totalFocusSec: 0, todayFocusSec: 0,
+        lastActiveDate: null,
       },
 
       // ─ Tasks ─
@@ -323,11 +324,15 @@ const useStore = create(
         const newXp    = user.xp + xpGain
         const newLevel = levelFromXp(newXp)
         const now      = new Date().toISOString()
+        const today    = now.split('T')[0]
+
+        // Incrementa streak apenas se o último dia ativo foi diferente de hoje
+        const newStreak = user.lastActiveDate === today ? user.streak : user.streak + 1
 
         set((s) => ({
           tasks: s.tasks.map(t => t.id === id ? { ...t, completed: true, completedAt: now } : t),
-          user:  { ...s.user, xp: newXp, level: newLevel },
-          xpToast:     { amount: xpGain, taskTitle: task.title, key: Date.now() },
+          user:  { ...s.user, xp: newXp, level: newLevel, streak: newStreak, lastActiveDate: today },
+          xpToast:      { amount: xpGain, taskTitle: task.title, key: Date.now() },
           levelUpModal: newLevel > oldLevel ? { from: oldLevel, to: newLevel } : null,
           focusTaskId: s.focusTaskId === id
             ? (s.tasks.find(t => !t.completed && t.id !== id)?.id || null)
@@ -338,7 +343,7 @@ const useStore = create(
         if (uid) {
           await Promise.all([
             supabase.from('tasks').update({ completed: true, completed_at: now }).eq('id', id),
-            supabase.from('user_stats').update({ xp: newXp, level: newLevel }).eq('id', uid),
+            supabase.from('user_stats').update({ xp: newXp, level: newLevel, streak: newStreak, last_active_date: today }).eq('id', uid),
           ])
         }
       },

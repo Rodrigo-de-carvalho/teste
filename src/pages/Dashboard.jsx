@@ -40,7 +40,7 @@ function calcXp(minutes, sessions) {
 export default function Dashboard() {
   const {
     user, getXpProgress, getFocusTask, getActiveTasks, getCompletedToday,
-    setFocusTask, completeFocusSession, setQuickCaptureOpen,
+    setFocusTask, completeFocusSession, setQuickCaptureOpen, setPage,
   } = useStore()
 
   const xp        = getXpProgress()
@@ -483,7 +483,7 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-display font-semibold text-on-surface">Próximas Intenções</h4>
-                <button onClick={() => useStore.getState().setPage('inbox')}
+                <button onClick={() => setPage('inbox')}
                   className="text-primary text-sm font-label hover:underline">
                   Ver todas
                 </button>
@@ -560,7 +560,7 @@ export default function Dashboard() {
               <ul className="space-y-3">
                 {projects.map(([name, count], i) => (
                   <li key={name} className="flex items-center gap-3 group cursor-pointer"
-                      onClick={() => useStore.getState().setPage('inbox')}>
+                      onClick={() => setPage('inbox')}>
                     <div className={`w-2 h-2 rounded-full flex-shrink-0
                       ${i === 0 ? 'bg-primary' : i === 1 ? 'bg-tertiary' : i === 2 ? 'bg-success' : 'bg-outline'}`} />
                     <span className="text-on-surface text-sm group-hover:text-primary transition-colors flex-1 truncate">
