@@ -139,6 +139,7 @@ const useStore = create(
           // Aborta se o usuário mudou enquanto aguardávamos o Supabase
           if (get().authUser?.id !== expectedUid) return
 
+          console.log('[Forje] user_stats do Supabase:', statsRes.data, statsRes.error)
           const stats = dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
           set((s) => ({
