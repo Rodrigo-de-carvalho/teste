@@ -387,10 +387,13 @@ const useStore = create(
 
         const uid = get().authUser?.id
         if (uid) {
-          await Promise.all([
+          const [, statsResult] = await Promise.all([
             supabase.from('tasks').update({ completed: true, completed_at: now }).eq('id', id),
             supabase.from('user_stats').upsert({ id: uid, xp: newXp, level: newLevel, streak: newStreak, last_active_date: today }),
           ])
+          if (statsResult.error) {
+            console.error('[Forje] completeTask XP save failed:', statsResult.error)
+          }
         }
       },
 

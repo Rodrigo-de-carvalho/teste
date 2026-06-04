@@ -36,7 +36,9 @@ export default function TaskDetailModal() {
       // Desmarcar subtrai XP — pede confirmação
       setConfirmUncheck(true)
     } else {
-      completeTask(editingTask.id)
+      const id = editingTask.id
+      if (form && form.title.trim()) updateTask(form.id, form)
+      completeTask(id)
       setEditingTask(null)
     }
   }
