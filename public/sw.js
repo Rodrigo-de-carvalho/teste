@@ -103,6 +103,25 @@ self.addEventListener('message', (event) => {
   )
 })
 
+// Recebe push do servidor (funciona com app FECHADO)
+self.addEventListener('push', (event) => {
+  let data = {}
+  try { data = event.data?.json() ?? {} } catch {}
+  const { title = '⏰ Forje', body = '', tag = 'push-' + Date.now(), taskId } = data
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon:   '/icon-192.png',
+      badge:  '/icon-192.png',
+      tag,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [300, 100, 300, 100, 300],
+      data: { taskId: taskId || tag },
+    }).then(() => broadcastNotifShown(tag, title, body))
+  )
+})
+
 // Abre o app ao clicar na notificação
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()

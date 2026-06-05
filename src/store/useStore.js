@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
-import { scheduleTaskNotification, cancelTaskNotification } from '../utils/notifications.js'
+import { scheduleTaskNotification, cancelTaskNotification, subscribeAndSavePush, notificationsSupported, notificationPermission } from '../utils/notifications.js'
 import { localIso } from '../utils/dates.js'
 
 // ── Theme ─────────────────────────────────────────────────────────────────────────
@@ -45,6 +45,14 @@ function withTimeout(promise, ms) {
     setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), ms)
   )
   return Promise.race([promise, timer])
+}
+
+// Calcula o timestamp UTC em que o push deve ser enviado pelo servidor
+function calcRemindSendAt(dueDate, dueTime, reminderOffset) {
+  if (!dueDate || reminderOffset == null) return null
+  const dueMs = new Date(`${dueDate}T${dueTime || '09:00'}`).getTime()
+  const remMs = dueMs - reminderOffset * 60 * 1000
+  return remMs > Date.now() ? new Date(remMs).toISOString() : null
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────────────
@@ -161,6 +169,11 @@ const useStore = create(
             navigator.serviceWorker.ready.then(scheduleAll).catch(scheduleAll)
           } else {
             scheduleAll()
+          }
+
+          // Garante que a subscription de push está salva no servidor
+          if (notificationsSupported() && notificationPermission() === 'granted') {
+            subscribeAndSavePush(expectedUid).catch(() => {})
           }
 
           if (stats?.lastActiveDate) {
@@ -285,10 +298,11 @@ const useStore = create(
         set((s) => ({ tasks: [tempTask, ...s.tasks] }))
 
         try {
+          const reminder_send_at = calcRemindSendAt(data.dueDate || null, data.dueTime || null, data.reminderOffset ?? null)
           const { data: saved, error } = await withTimeout(
             supabase
               .from('tasks')
-              .insert({ ...jsTaskToDb(data), title: data.title.trim(), user_id: uid })
+              .insert({ ...jsTaskToDb(data), title: data.title.trim(), user_id: uid, reminder_send_at, reminder_sent_at: null })
               .select('*, subtasks(*)')
               .single(),
             10000
@@ -318,6 +332,13 @@ const useStore = create(
 
         try {
           const dbPatch = jsTaskToDb(patch)
+          // Recalcula reminder_send_at quando campos de lembrete mudam
+          if ('dueDate' in patch || 'dueTime' in patch || 'reminderOffset' in patch) {
+            const orig   = get().tasks.find(t => t.id === id)
+            const merged = { ...orig, ...patch }
+            dbPatch.reminder_send_at = calcRemindSendAt(merged.dueDate, merged.dueTime, merged.reminderOffset)
+            dbPatch.reminder_sent_at = null
+          }
           if (Object.keys(dbPatch).length > 0) {
             await supabase.from('tasks').update(dbPatch).eq('id', id)
           }
@@ -452,7 +473,7 @@ const useStore = create(
         const uid = get().authUser?.id
         if (uid) {
           await Promise.all([
-            supabase.from('tasks').update({ completed: false, completed_at: null }).eq('id', id),
+            supabase.from('tasks').update({ completed: false, completed_at: null, reminder_sent_at: null }).eq('id', id),
             supabase.from('user_stats').upsert({ id: uid, xp: newXp, level: newLevel }),
           ])
         }

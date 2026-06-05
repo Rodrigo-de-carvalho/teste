@@ -1,4 +1,36 @@
+import { supabase } from '../lib/supabase.js'
+
 const _timers = new Map()
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
+
+function urlBase64ToUint8Array(b64) {
+  const padding = '='.repeat((4 - b64.length % 4) % 4)
+  const raw = atob((b64 + padding).replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+export async function subscribeAndSavePush(userId) {
+  if (!VAPID_PUBLIC_KEY || !('PushManager' in window) || !('serviceWorker' in navigator)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    let sub   = await reg.pushManager.getSubscription()
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly:      true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      })
+    }
+    const json = sub.toJSON()
+    await supabase.from('push_subscriptions').upsert({
+      user_id:  userId,
+      endpoint: json.endpoint,
+      p256dh:   json.keys.p256dh,
+      auth_key: json.keys.auth,
+    })
+  } catch (err) {
+    console.warn('[Forje] push subscribe failed:', err)
+  }
+}
 
 const PRIORITY_LABEL = {
   critical: '🚨 Urgente',

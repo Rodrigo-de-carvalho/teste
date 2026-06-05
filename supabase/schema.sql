@@ -13,8 +13,10 @@ create table if not exists public.tasks (
   project      text default 'Geral',
   due_date        text,
   due_time        text,
-  reminder_offset integer default null,
-  completed       boolean default false,
+  reminder_offset  integer default null,
+  reminder_send_at timestamptz,           -- UTC absoluto do push (calculado pelo cliente)
+  reminder_sent_at timestamptz,           -- preenchido após o servidor enviar o push
+  completed        boolean default false,
   completed_at timestamptz,
   week_day     integer,
   created_at   timestamptz default now(),
@@ -41,6 +43,15 @@ create table if not exists public.user_stats (
   focus_task_id   uuid references public.tasks(id) on delete set null
 );
 
+-- ── Subscriptions de push (Web Push API) ────────────────────────────────────
+create table if not exists public.push_subscriptions (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  endpoint   text not null,
+  p256dh     text not null,
+  auth_key   text not null,
+  updated_at timestamptz default now()
+);
+
 -- ── Row Level Security ───────────────────────────────────────
 alter table public.tasks      enable row level security;
 alter table public.subtasks   enable row level security;
@@ -58,6 +69,13 @@ create policy "subtasks_own" on public.subtasks
   for all using (
     task_id in (select id from public.tasks where user_id = auth.uid())
   );
+
+-- Push subscriptions: usuário só acessa as próprias
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "push_own" on public.push_subscriptions;
+create policy "push_own" on public.push_subscriptions
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- User stats: usuário só acessa os próprios stats
 drop policy if exists "stats_own" on public.user_stats;
@@ -114,3 +132,53 @@ begin
   alter publication supabase_realtime add table public.user_stats;
 exception when others then null;
 end $$;
+
+-- ── Função para a Edge Function send-reminders ────────────────────────────────
+-- Retorna tarefas com lembrete vencendo nos próximos 60 segundos (ou atrasado até 2 min)
+create or replace function public.get_due_reminder_tasks()
+returns table(
+  task_id  uuid,
+  title    text,
+  priority text,
+  due_time text,
+  endpoint text,
+  p256dh   text,
+  auth_key text
+)
+language sql
+security definer
+as $$
+  select
+    t.id       as task_id,
+    t.title,
+    t.priority,
+    t.due_time,
+    ps.endpoint,
+    ps.p256dh,
+    ps.auth_key
+  from public.tasks t
+  join public.push_subscriptions ps on ps.user_id = t.user_id
+  where
+    t.completed         = false
+    and t.reminder_send_at is not null
+    and t.reminder_sent_at is null
+    and t.reminder_send_at between (now() - interval '2 minutes') and (now() + interval '1 minute');
+$$;
+
+-- ── Cron job: chama send-reminders a cada minuto ──────────────────────────────
+-- Execute isso UMA VEZ no SQL Editor do Supabase:
+--
+-- select cron.schedule(
+--   'forje-send-reminders',
+--   '* * * * *',
+--   $$
+--     select net.http_post(
+--       url    := current_setting('app.supabase_url') || '/functions/v1/send-reminders',
+--       headers := jsonb_build_object(
+--         'Content-Type',  'application/json',
+--         'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+--       ),
+--       body := '{}'::jsonb
+--     ) as request_id;
+--   $$
+-- );
