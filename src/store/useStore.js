@@ -143,8 +143,13 @@ const useStore = create(
             focusTaskId: validFocusId || (tasks.find(t => !t.completed)?.id || null),
           }))
 
-          // Reagenda notificações após carregar tarefas (timers são perdidos ao fechar o app)
-          tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} })
+          // Reagenda notificações — espera o SW estar ativo para usar canal seguro
+          const scheduleAll = () => tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} })
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(scheduleAll).catch(scheduleAll)
+          } else {
+            scheduleAll()
+          }
 
           if (stats?.lastActiveDate) {
             const yest = new Date(); yest.setDate(yest.getDate() - 1)
