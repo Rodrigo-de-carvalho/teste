@@ -153,6 +153,9 @@ const useStore = create(
           const stats = statsRes.error ? null : dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
 
+          // Lê XP local (localStorage) antes de ser sobrescrito pelo Supabase
+          const localXp = get().user.xp
+
           // Valida focusTaskId — descarta se apontar para tarefa concluída ou inexistente
           const savedFocusId = stats?.focusTaskId
           const validFocusId = tasks.find(t => t.id === savedFocusId && !t.completed)?.id || null
@@ -162,6 +165,15 @@ const useStore = create(
             tasks,
             focusTaskId: validFocusId || (tasks.find(t => !t.completed)?.id || null),
           }))
+
+          // Se Supabase retornou xp=0 mas localStorage tinha xp>0, restaura e sincroniza
+          if (stats && stats.xp === 0 && localXp > 0) {
+            const restoredLevel = levelFromXp(localXp)
+            set((s) => ({ user: { ...s.user, xp: localXp, level: restoredLevel } }))
+            supabase.from('user_stats')
+              .upsert({ id: expectedUid, xp: localXp, level: restoredLevel })
+              .catch(() => {})
+          }
 
           // Reagenda notificações — espera o SW estar ativo para usar canal seguro
           const scheduleAll = () => tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} })
