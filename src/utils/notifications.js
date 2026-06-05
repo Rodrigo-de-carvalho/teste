@@ -14,45 +14,47 @@ export async function subscribeAndSavePush(userId) {
   if (!('PushManager' in window)) return { ok: false, error: 'PushManager não suportado neste browser' }
   if (!('serviceWorker' in navigator)) return { ok: false, error: 'ServiceWorker não suportado' }
 
-  async function _work() {
-    let step = 'getRegistration'
-    try {
-      // getRegistration não bloqueia — retorna imediatamente se o SW existe
-      let reg = await navigator.serviceWorker.getRegistration('/')
-      if (!reg) return { ok: false, error: 'Service Worker não encontrado — recarregue o app' }
-      step = 'getSubscription'
-      let sub = await reg.pushManager.getSubscription()
-      if (sub) {
-        const json = sub.toJSON()
-        if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
-      }
-      step = 'subscribe'
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
+  let step = 'getRegistration'
+  try {
+    // Busca qualquer registro de SW ativo
+    const regs = await navigator.serviceWorker.getRegistrations()
+    const reg  = regs.find(r => r.active) || regs[0]
+    if (!reg) return { ok: false, error: 'SW não encontrado — recarregue o app' }
+    if (!reg.pushManager) return { ok: false, error: 'pushManager indisponível neste browser' }
+
+    step = 'getSubscription'
+    let sub = await reg.pushManager.getSubscription()
+    if (sub) {
+      const json = sub.toJSON()
+      if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
+    }
+
+    step = 'subscribe'
+    if (!sub) {
+      // Timeout de 8s para o subscribe (precisa contatar servidores FCM)
+      sub = await Promise.race([
+        reg.pushManager.subscribe({
           userVisibleOnly:      true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        })
-      }
-      step = 'upsert'
-      const json = sub.toJSON()
-      const { error } = await supabase.from('push_subscriptions').upsert({
-        user_id:  userId,
-        endpoint: json.endpoint,
-        p256dh:   json.keys.p256dh,
-        auth_key: json.keys.auth,
-      })
-      if (error) return { ok: false, error: `upsert: ${error.message}` }
-      return { ok: true }
-    } catch (err) {
-      console.warn('[Forje] push subscribe failed at', step, err)
-      return { ok: false, error: `${step}: ${String(err)}` }
+        }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('FCM timeout — verifique sua conexão e tente novamente')), 8000)),
+      ])
     }
-  }
 
-  const timeout = new Promise(resolve =>
-    setTimeout(() => resolve({ ok: false, error: 'Timeout em sw.ready — feche outras abas do app e tente de novo' }), 12000)
-  )
-  return Promise.race([_work(), timeout])
+    step = 'upsert'
+    const json = sub.toJSON()
+    const { error } = await supabase.from('push_subscriptions').upsert({
+      user_id:  userId,
+      endpoint: json.endpoint,
+      p256dh:   json.keys.p256dh,
+      auth_key: json.keys.auth,
+    })
+    if (error) return { ok: false, error: `Erro ao salvar: ${error.message}` }
+    return { ok: true }
+  } catch (err) {
+    console.warn('[Forje] push subscribe failed at', step, err)
+    return { ok: false, error: `${step}: ${String(err)}` }
+  }
 }
 
 const PRIORITY_LABEL = {
