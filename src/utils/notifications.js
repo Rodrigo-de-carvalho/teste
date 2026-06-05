@@ -53,13 +53,16 @@ export async function subscribeAndSavePush(userId, onStep) {
     step = 'upsert'
     report('4/4 salvando no banco...')
     const json = sub.toJSON()
-    const { error } = await supabase.from('push_subscriptions').upsert({
-      user_id:  userId,
-      endpoint: json.endpoint,
-      p256dh:   json.keys.p256dh,
-      auth_key: json.keys.auth,
-    })
-    if (error) return { ok: false, error: `Erro ao salvar: ${error.message}` }
+    const upsertResult = await Promise.race([
+      supabase.from('push_subscriptions').upsert({
+        user_id:  userId,
+        endpoint: json.endpoint,
+        p256dh:   json.keys.p256dh,
+        auth_key: json.keys.auth,
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('banco timeout — a subscription foi registrada mas não salva')), 6000)),
+    ])
+    if (upsertResult.error) return { ok: false, error: `Erro ao salvar: ${upsertResult.error.message}` }
     return { ok: true }
   } catch (err) {
     console.warn('[Forje] push failed at', step, err)
