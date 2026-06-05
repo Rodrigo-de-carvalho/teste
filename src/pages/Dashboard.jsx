@@ -55,36 +55,78 @@ export default function Dashboard() {
   const [frozenGrade, setFrozenGrade]       = useState(null)
   const [abandonWarning, setAbandonWarning] = useState(false)
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
-  const intervalRef = useRef(null)
+  const intervalRef     = useRef(null)
+  const endTimeRef      = useRef(null)    // timestamp absoluto de fim da sessão
+  const timerSecRef     = useRef(25 * 60) // espelha timerSec para leitura segura em closures
+  const timerMinutesRef = useRef(25)      // espelha timerMinutes para leitura segura em closures
+  const completedRef    = useRef(false)   // evita conclusão dupla
+
+  // Mantém refs sincronizadas com state
+  useEffect(() => { timerMinutesRef.current = timerMinutes }, [timerMinutes])
+
+  function updateTimerSec(v) { timerSecRef.current = v; setTimerSec(v) }
+  function sendSwMsg(data) { navigator.serviceWorker?.controller?.postMessage(data) }
 
   function selectDuration(min) {
     if (running) return
+    timerMinutesRef.current = min
     setTimerMinutes(min)
-    setTimerSec(min * 60)
+    updateTimerSec(min * 60)
   }
 
+  // Encerra a sessão — chamado pelo interval ou pelo handler de visibilidade
+  function finishSession() {
+    if (completedRef.current) return
+    completedRef.current = true
+    clearInterval(intervalRef.current)
+    endTimeRef.current = null
+    sendSwMsg({ type: 'CANCEL_FOCUS_NOTIFICATION' })
+    const mins = timerMinutesRef.current
+    setRunning(false)
+    updateTimerSec(mins * 60)
+    setSessions(prev => {
+      const next = prev + 1
+      completeFocusSession(mins, next)
+      return next
+    })
+    setTimeout(() => { completedRef.current = false }, 1000)
+  }
+
+  // Timer baseado em timestamp — preciso mesmo com app em segundo plano
   useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => {
-        setTimerSec(s => {
-          if (s <= 1) {
-            clearInterval(intervalRef.current)
-            setRunning(false)
-            setSessions(n => {
-              const next = n + 1
-              completeFocusSession(timerMinutes, next)
-              return next
-            })
-            return timerMinutes * 60
-          }
-          return s - 1
-        })
-      }, 1000)
-    } else {
-      clearInterval(intervalRef.current)
+    clearInterval(intervalRef.current)
+    if (!running) {
+      endTimeRef.current = null
+      sendSwMsg({ type: 'CANCEL_FOCUS_NOTIFICATION' })
+      return
     }
+    completedRef.current = false
+    endTimeRef.current = Date.now() + timerSecRef.current * 1000
+    sendSwMsg({
+      type: 'SCHEDULE_FOCUS_NOTIFICATION',
+      delayMs: timerSecRef.current * 1000,
+      title: '🔥 Sessão concluída!',
+      body: `${timerMinutesRef.current} min de foco completos. Ótimo trabalho!`,
+    })
+    intervalRef.current = setInterval(() => {
+      const rem = Math.ceil((endTimeRef.current - Date.now()) / 1000)
+      if (rem <= 0) { finishSession(); return }
+      updateTimerSec(rem)
+    }, 500)
     return () => clearInterval(intervalRef.current)
-  }, [running, completeFocusSession, timerMinutes])
+  }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Recalcula ao voltar do segundo plano (celular desbloqueado, app reaberto)
+  useEffect(() => {
+    function onVisible() {
+      if (document.hidden || !running || !endTimeRef.current) return
+      const rem = Math.ceil((endTimeRef.current - Date.now()) / 1000)
+      if (rem <= 0) finishSession()
+      else updateTimerSec(rem)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [running]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleResetClick() {
     if (running || timerSec < timerMinutes * 60) {
@@ -95,8 +137,11 @@ export default function Dashboard() {
   }
 
   function doReset(abandon) {
+    clearInterval(intervalRef.current)
+    sendSwMsg({ type: 'CANCEL_FOCUS_NOTIFICATION' })
+    endTimeRef.current = null
     setRunning(false)
-    setTimerSec(timerMinutes * 60)
+    updateTimerSec(timerMinutes * 60)
     setAbandonWarning(false)
     if (abandon) {
       setFrozenGrade(getForgeGrade(sessions))

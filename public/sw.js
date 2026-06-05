@@ -1,5 +1,6 @@
-const CACHE = 'forje-v4'
+const CACHE = 'forje-v5'
 const ASSETS_TO_CACHE = ['/']
+let focusTimerTimeout = null
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -35,6 +36,25 @@ self.addEventListener('fetch', (event) => {
 
 // Recebe pedido de notificação enviado pelo app
 self.addEventListener('message', (event) => {
+  // Agenda notificação de fim de sessão de foco
+  if (event.data?.type === 'SCHEDULE_FOCUS_NOTIFICATION') {
+    if (focusTimerTimeout) clearTimeout(focusTimerTimeout)
+    const { delayMs, title, body } = event.data
+    focusTimerTimeout = setTimeout(() => {
+      focusTimerTimeout = null
+      self.registration.showNotification(title, {
+        body, icon: '/icon-192.png', badge: '/icon-192.png',
+        tag: 'forge-focus', renotify: true, requireInteraction: false,
+      })
+    }, delayMs)
+    return
+  }
+
+  if (event.data?.type === 'CANCEL_FOCUS_NOTIFICATION') {
+    if (focusTimerTimeout) { clearTimeout(focusTimerTimeout); focusTimerTimeout = null }
+    return
+  }
+
   if (event.data?.type !== 'SHOW_NOTIFICATION') return
   const { title, body, tag } = event.data
   event.waitUntil(
