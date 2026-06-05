@@ -130,6 +130,16 @@ const useStore = create(
           // Aborta se o usuário mudou enquanto aguardávamos o Supabase
           if (get().authUser?.id !== expectedUid) return
 
+          if (statsRes.error) {
+            console.warn('[Forje] user_stats erro:', statsRes.error.code, statsRes.error.message)
+            if (statsRes.error.code === 'PGRST116') {
+              // Linha não existe — cria com defaults
+              await supabase.from('user_stats').insert({ id: expectedUid }).catch(() => {})
+            }
+          } else {
+            console.warn('[Forje] user_stats carregado: xp=' + statsRes.data?.xp + ' level=' + statsRes.data?.level)
+          }
+
           const stats = statsRes.error ? null : dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
 
@@ -500,6 +510,16 @@ const useStore = create(
       },
 
       // ── Helpers ─────────────────────────────────────────────────────────────────────────
+      recalcXpFromTasks: async () => {
+        const { tasks, authUser } = get()
+        if (!authUser?.id) return null
+        const xp    = tasks.filter(t => t.completed).reduce((sum, t) => sum + (XP_TABLE[t.priority] ?? 20), 0)
+        const level = levelFromXp(xp)
+        set(s => ({ user: { ...s.user, xp, level } }))
+        await supabase.from('user_stats').upsert({ id: authUser.id, xp, level })
+        return { xp, level }
+      },
+
       clearXpToast:      () => set({ xpToast: null }),
       clearLevelUpModal: () => set({ levelUpModal: null }),
 

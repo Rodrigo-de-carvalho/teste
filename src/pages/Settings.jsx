@@ -11,7 +11,7 @@ import {
 } from '../utils/notifications'
 
 export default function Settings() {
-  const { user, darkMode, toggleDarkMode, logout, deleteAccount, resetXp } = useStore()
+  const { user, darkMode, toggleDarkMode, logout, deleteAccount, resetXp, recalcXpFromTasks } = useStore()
   const [name, setName]             = useState(user.name || '')
   const [saving, setSaving]         = useState(false)
 
@@ -22,6 +22,8 @@ export default function Settings() {
   const [confirmResetXp, setConfirmResetXp] = useState(false)
   const [resettingXp, setResettingXp]       = useState(false)
   const [resetDone, setResetDone]           = useState(false)
+  const [recalcing, setRecalcing]           = useState(false)
+  const [recalcDone, setRecalcDone]         = useState(null)
   const [showInstall, setShowInstall]       = useState(canInstall())
   const [notifPerm, setNotifPerm]           = useState(notificationPermission())
   const [notifLoading, setNotifLoading]     = useState(false)
@@ -67,6 +69,17 @@ export default function Settings() {
     setDeleting(true)
     await deleteAccount()
     setDeleting(false)
+  }
+
+  async function handleRecalcXp() {
+    setRecalcing(true)
+    try {
+      const result = await recalcXpFromTasks()
+      setRecalcDone(result)
+      setTimeout(() => setRecalcDone(null), 6000)
+    } finally {
+      setRecalcing(false)
+    }
   }
 
   async function handleResetXp() {
@@ -170,6 +183,30 @@ export default function Settings() {
             </div>
           ))}
         </div>
+
+        {/* Recuperar XP */}
+        {recalcDone ? (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold mb-3"
+            style={{ background: 'rgba(76,175,80,0.1)', color: 'var(--clr-success, #4caf50)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+            XP recuperado: {recalcDone.xp} XP · Nível {recalcDone.level}
+          </motion.div>
+        ) : (
+          <button
+            onClick={handleRecalcXp}
+            disabled={recalcing}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold
+                       text-primary transition-all hover:bg-primary/10 mb-3 disabled:opacity-50"
+            style={{ borderColor: 'rgba(var(--clr-primary-rgb,103,80,164),0.4)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]">calculate</span>
+            {recalcing ? 'Calculando...' : 'Recuperar XP pelas tarefas'}
+          </button>
+        )}
 
         {/* Reset XP — três estados: botão / confirmação / sucesso */}
         {resetDone ? (
