@@ -4,6 +4,11 @@ import useStore from '../store/useStore'
 import ProgressRing from '../components/ui/ProgressRing'
 import TaskCard from '../components/tasks/TaskCard'
 import { formatFocusTime, todayString } from '../utils/dates'
+import {
+  notificationsSupported,
+  notificationPermission,
+  requestNotificationPermission,
+} from '../utils/notifications'
 
 const DURATION_OPTIONS = [15, 25, 45, 60]
 
@@ -55,6 +60,22 @@ export default function Dashboard() {
   const [frozenGrade, setFrozenGrade]       = useState(null)
   const [abandonWarning, setAbandonWarning] = useState(false)
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
+
+  const [notifPerm, setNotifPerm]           = useState(notificationPermission())
+  const [notifDismissed, setNotifDismissed] = useState(
+    () => localStorage.getItem('forge-notif-dismissed') === '1'
+  )
+  const showNotifBanner = notificationsSupported() && notifPerm === 'default' && !notifDismissed
+
+  async function handleEnableNotif() {
+    const granted = await requestNotificationPermission()
+    setNotifPerm(granted ? 'granted' : 'denied')
+  }
+
+  function dismissNotifBanner() {
+    localStorage.setItem('forge-notif-dismissed', '1')
+    setNotifDismissed(true)
+  }
   const intervalRef     = useRef(null)
   const endTimeRef      = useRef(null)    // timestamp absoluto de fim da sessão
   const timerSecRef     = useRef(25 * 60) // espelha timerSec para leitura segura em closures
@@ -185,6 +206,43 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in">
+
+      {/* Banner de permissão de notificações */}
+      <AnimatePresence>
+        {showNotifBanner && (
+          <motion.div
+            key="notif-banner"
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className="mb-6 rounded-2xl p-4 flex items-center gap-3 border"
+            style={{ background: 'color-mix(in srgb, var(--clr-primary) 8%, transparent)', borderColor: 'color-mix(in srgb, var(--clr-primary) 20%, transparent)' }}
+          >
+            <span className="material-symbols-outlined text-primary text-[24px] flex-shrink-0"
+              style={{ fontVariationSettings: "'FILL' 1" }}>notifications_active</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-on-surface">Ativar lembretes de tarefas</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">Receba avisos quando suas tarefas vencerem, mesmo com o app em segundo plano.</p>
+            </div>
+            <button
+              onClick={handleEnableNotif}
+              className="flex-shrink-0 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold
+                         transition-all hover:opacity-90 active:scale-95"
+            >
+              Ativar
+            </button>
+            <button
+              onClick={dismissNotifBanner}
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full
+                         text-on-surface-variant/50 hover:text-on-surface-variant transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <section className="mb-10">
         <p className="font-label text-primary text-xs font-semibold tracking-[0.2em] uppercase mb-1">
           {todayString()}

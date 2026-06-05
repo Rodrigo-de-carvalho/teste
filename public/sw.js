@@ -1,6 +1,7 @@
-const CACHE = 'forje-v5'
+const CACHE = 'forje-v6'
 const ASSETS_TO_CACHE = ['/']
 let focusTimerTimeout = null
+const scheduledNotifs = new Map() // taskId -> timeoutId
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -52,6 +53,27 @@ self.addEventListener('message', (event) => {
 
   if (event.data?.type === 'CANCEL_FOCUS_NOTIFICATION') {
     if (focusTimerTimeout) { clearTimeout(focusTimerTimeout); focusTimerTimeout = null }
+    return
+  }
+
+  // Agenda notificação de tarefa (por ID, cancelável individualmente)
+  if (event.data?.type === 'SCHEDULE_NOTIFICATION') {
+    const { id, delayMs, title, body } = event.data
+    if (scheduledNotifs.has(id)) clearTimeout(scheduledNotifs.get(id))
+    const tid = setTimeout(() => {
+      scheduledNotifs.delete(id)
+      self.registration.showNotification(title, {
+        body, icon: '/icon-192.png', badge: '/icon-192.png',
+        tag: id, renotify: true, requireInteraction: false,
+      })
+    }, delayMs)
+    scheduledNotifs.set(id, tid)
+    return
+  }
+
+  if (event.data?.type === 'CANCEL_NOTIFICATION') {
+    const { id } = event.data
+    if (scheduledNotifs.has(id)) { clearTimeout(scheduledNotifs.get(id)); scheduledNotifs.delete(id) }
     return
   }
 
