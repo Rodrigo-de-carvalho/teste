@@ -1,4 +1,4 @@
-const CACHE = 'forje-v7'
+const CACHE = 'forje-v8'
 const ASSETS_TO_CACHE = ['/']
 let focusTimerTimeout = null
 const scheduledNotifs = new Map() // taskId -> timeoutId
