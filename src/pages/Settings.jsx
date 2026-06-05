@@ -30,6 +30,7 @@ export default function Settings() {
   const [notifLoading, setNotifLoading]     = useState(false)
   const [pushResult, setPushResult]         = useState(null)
   const [pushLoading, setPushLoading]       = useState(false)
+  const [pushStep, setPushStep]             = useState('')
 
   useEffect(() => {
     const unsub = onInstallReady(() => setShowInstall(true))
@@ -46,10 +47,12 @@ export default function Settings() {
   async function handleRegisterPush() {
     setPushLoading(true)
     setPushResult(null)
+    setPushStep('')
     const uid = useStore.getState().authUser?.id
-    const result = await subscribeAndSavePush(uid)
+    const result = await subscribeAndSavePush(uid, setPushStep)
     setPushResult(result)
     setPushLoading(false)
+    setPushStep('')
   }
 
   const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -293,7 +296,7 @@ export default function Settings() {
                 style={{ borderColor: 'var(--clr-primary)', color: 'var(--clr-primary)' }}
               >
                 <span className="material-symbols-outlined text-[16px]">cloud_sync</span>
-                {pushLoading ? 'Registrando...' : 'Registrar push neste dispositivo'}
+                {pushLoading ? (pushStep || 'Iniciando...') : 'Registrar push neste dispositivo'}
               </button>
               {pushResult && (
                 <p className={`text-xs mt-2 text-center ${pushResult.ok ? 'text-success' : 'text-error'}`}>

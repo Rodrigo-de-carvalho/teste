@@ -9,39 +9,49 @@ function urlBase64ToUint8Array(b64) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
 }
 
-export async function subscribeAndSavePush(userId) {
+export async function subscribeAndSavePush(userId, onStep) {
+  const report = (s) => { console.warn('[Forje push]', s); onStep?.(s) }
+
   if (!VAPID_PUBLIC_KEY) return { ok: false, error: 'VAPID key ausente no build' }
-  if (!('PushManager' in window)) return { ok: false, error: 'PushManager não suportado neste browser' }
+  if (!('PushManager' in window)) return { ok: false, error: 'PushManager não suportado' }
   if (!('serviceWorker' in navigator)) return { ok: false, error: 'ServiceWorker não suportado' }
 
-  let step = 'getRegistration'
+  let step = 'getRegistrations'
   try {
-    // Busca qualquer registro de SW ativo
-    const regs = await navigator.serviceWorker.getRegistrations()
-    const reg  = regs.find(r => r.active) || regs[0]
+    report('1/4 buscando SW...')
+    const regs = await Promise.race([
+      navigator.serviceWorker.getRegistrations(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('getRegistrations timeout')), 5000)),
+    ])
+    const reg = regs.find(r => r.active) || regs[0]
     if (!reg) return { ok: false, error: 'SW não encontrado — recarregue o app' }
     if (!reg.pushManager) return { ok: false, error: 'pushManager indisponível neste browser' }
 
     step = 'getSubscription'
-    let sub = await reg.pushManager.getSubscription()
+    report('2/4 verificando subscription...')
+    let sub = await Promise.race([
+      reg.pushManager.getSubscription(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('getSubscription timeout')), 5000)),
+    ])
     if (sub) {
       const json = sub.toJSON()
       if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
     }
 
     step = 'subscribe'
+    report('3/4 registrando no FCM...')
     if (!sub) {
-      // Timeout de 8s para o subscribe (precisa contatar servidores FCM)
       sub = await Promise.race([
         reg.pushManager.subscribe({
           userVisibleOnly:      true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('FCM timeout — verifique sua conexão e tente novamente')), 8000)),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('FCM timeout — verifique sua conexão')), 10000)),
       ])
     }
 
     step = 'upsert'
+    report('4/4 salvando no banco...')
     const json = sub.toJSON()
     const { error } = await supabase.from('push_subscriptions').upsert({
       user_id:  userId,
@@ -52,7 +62,7 @@ export async function subscribeAndSavePush(userId) {
     if (error) return { ok: false, error: `Erro ao salvar: ${error.message}` }
     return { ok: true }
   } catch (err) {
-    console.warn('[Forje] push subscribe failed at', step, err)
+    console.warn('[Forje] push failed at', step, err)
     return { ok: false, error: `${step}: ${String(err)}` }
   }
 }
