@@ -15,9 +15,11 @@ export async function subscribeAndSavePush(userId) {
   if (!('serviceWorker' in navigator)) return { ok: false, error: 'ServiceWorker não suportado' }
 
   async function _work() {
-    let step = 'sw.ready'
+    let step = 'getRegistration'
     try {
-      const reg = await navigator.serviceWorker.ready
+      // getRegistration não bloqueia — retorna imediatamente se o SW existe
+      let reg = await navigator.serviceWorker.getRegistration('/')
+      if (!reg) return { ok: false, error: 'Service Worker não encontrado — recarregue o app' }
       step = 'getSubscription'
       let sub = await reg.pushManager.getSubscription()
       if (sub) {

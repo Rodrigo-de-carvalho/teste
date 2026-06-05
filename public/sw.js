@@ -6,7 +6,9 @@ const scheduledNotifs = new Map() // taskId -> timeoutId
 self.addEventListener('install', (event) => {
   self.skipWaiting()
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE)
+      .then(cache => cache.addAll(ASSETS_TO_CACHE))
+      .catch(() => {}) // Não bloqueia instalação se a rede falhar
   )
 })
 
