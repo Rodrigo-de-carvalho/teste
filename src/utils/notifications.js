@@ -7,6 +7,15 @@ const PRIORITY_LABEL = {
   low:      '🟢 Baixa prioridade',
 }
 
+export const REMINDER_OPTIONS = [
+  { label: 'Na hora da tarefa',  value: 0    },
+  { label: '15 min antes',       value: 15   },
+  { label: '30 min antes',       value: 30   },
+  { label: '1 hora antes',       value: 60   },
+  { label: '2 horas antes',      value: 120  },
+  { label: '1 dia antes',        value: 1440 },
+]
+
 function isAndroid() {
   return typeof window !== 'undefined' && !!window.Android
 }
@@ -41,36 +50,61 @@ function showBrowserNotification(title, body, tag) {
   }
 }
 
+function buildBody(task) {
+  const priority = PRIORITY_LABEL[task.priority] || ''
+  if (task.dueTime) return `${priority} · vence às ${task.dueTime}`
+  return priority
+}
+
+// Calcula o timestamp (ms) em que o lembrete deve disparar
+function calcReminderMs(task) {
+  if (!task.dueDate || task.reminderOffset == null) return null
+  const time  = task.dueTime || '09:00'
+  const dueMs = new Date(`${task.dueDate}T${time}`).getTime()
+  if (isNaN(dueMs)) return null
+  return dueMs - task.reminderOffset * 60 * 1000
+}
+
 export function scheduleTaskNotification(task) {
-  if (!task.dueDate) return
-
-  const time     = task.dueTime || '09:00'
-  const dateTime = new Date(`${task.dueDate}T${time}`)
-  const delay    = dateTime.getTime() - Date.now()
-  if (isNaN(delay) || delay <= 0) return
-
-  const title = `⚡ ${task.title}`
-  const body  = `${PRIORITY_LABEL[task.priority] || ''} — vence agora!`
+  if (task.completed) return
 
   if (isAndroid()) {
-    window.Android?.scheduleNotification?.(task.id, title, body, dateTime.getTime())
+    if (!task.dueDate || task.reminderOffset == null) return
+    const time      = task.dueTime || '09:00'
+    const reminderMs = new Date(`${task.dueDate}T${time}`).getTime() - task.reminderOffset * 60 * 1000
+    window.Android?.scheduleNotification?.(task.id, `⏰ ${task.title}`, buildBody(task), reminderMs)
     return
   }
 
   if (!notificationsSupported() || Notification.permission !== 'granted') return
 
+  const reminderMs = calcReminderMs(task)
+  if (reminderMs == null) return
+
   cancelTaskNotification(task.id)
 
+  const now        = Date.now()
+  const TWO_HOURS  = 2 * 60 * 60 * 1000
+  const title      = `⏰ ${task.title}`
+  const body       = buildBody(task)
+
+  // Catch-up: lembrete que passou nas últimas 2h — notifica imediatamente
+  if (reminderMs > now - TWO_HOURS && reminderMs <= now) {
+    showBrowserNotification(title, body, task.id)
+    return
+  }
+
+  if (reminderMs <= now) return // muito antigo, ignora
+
+  const delayMs = reminderMs - now
   const sw = swController()
   if (sw) {
-    // Via SW — funciona mesmo com aba em background
-    sw.postMessage({ type: 'SCHEDULE_NOTIFICATION', id: task.id, delayMs: delay, title, body })
+    sw.postMessage({ type: 'SCHEDULE_NOTIFICATION', id: task.id, delayMs, title, body })
   } else {
-    // Fallback: setTimeout no main thread
     const timerId = setTimeout(() => {
       showBrowserNotification(title, body, task.id)
       _timers.delete(task.id)
-    }, delay)
+    }, delayMs)
     _timers.set(task.id, timerId)
   }
 }
@@ -80,9 +114,7 @@ export function cancelTaskNotification(taskId) {
     window.Android?.cancelNotification?.(taskId)
     return
   }
-  // Cancela no SW
   swController()?.postMessage({ type: 'CANCEL_NOTIFICATION', id: taskId })
-  // Cancela setTimeout (fallback)
   const timerId = _timers.get(taskId)
   if (timerId !== undefined) { clearTimeout(timerId); _timers.delete(taskId) }
 }

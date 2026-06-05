@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
+import { REMINDER_OPTIONS } from '../../utils/notifications'
 
 const PRIORITIES = [
   { value: 'critical', label: '🔴 Crítico', color: 'bg-error-container text-on-error-container' },
@@ -9,7 +10,7 @@ const PRIORITIES = [
   { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
 ]
 
-const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', dueTime: '' }
+const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', dueTime: '', reminderOffset: null }
 
 export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
@@ -201,6 +202,24 @@ export default function QuickCapture() {
                           onChange={e => setForm(f => ({ ...f, dueTime: e.target.value }))}
                         />
                       </div>
+                      {form.dueDate && (
+                        <div className="flex flex-col gap-1 col-span-2">
+                          <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">
+                            <span className="material-symbols-outlined text-[12px] align-middle mr-0.5">notifications</span>
+                            Lembrete
+                          </label>
+                          <select
+                            className="input-field text-sm"
+                            value={form.reminderOffset ?? ''}
+                            onChange={e => setForm(f => ({ ...f, reminderOffset: e.target.value === '' ? null : Number(e.target.value) }))}
+                          >
+                            <option value="">Sem lembrete</option>
+                            {REMINDER_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="flex flex-col gap-1 col-span-2">
                         <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Notas</label>
                         <textarea

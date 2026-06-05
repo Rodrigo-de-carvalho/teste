@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
+import { REMINDER_OPTIONS } from '../../utils/notifications'
 
 const PRIORITIES = ['critical','high','medium','low']
 const PRIORITY_LABELS = { critical: '🔴 Crítico', high: '🟠 Alto', medium: '🔵 Médio', low: '⚪ Baixo' }
@@ -39,12 +40,13 @@ export default function TaskDetailModal() {
       const id = editingTask.id
       // Salva alterações do form antes de completar — apenas se algo mudou
       const hasChanges = form && form.title.trim() && (
-        form.title    !== editingTask.title    ||
-        form.notes    !== editingTask.notes    ||
-        form.priority !== editingTask.priority ||
-        form.project  !== editingTask.project  ||
-        form.dueDate  !== editingTask.dueDate  ||
-        form.dueTime  !== editingTask.dueTime
+        form.title          !== editingTask.title          ||
+        form.notes          !== editingTask.notes          ||
+        form.priority       !== editingTask.priority       ||
+        form.project        !== editingTask.project        ||
+        form.dueDate        !== editingTask.dueDate        ||
+        form.dueTime        !== editingTask.dueTime        ||
+        form.reminderOffset !== editingTask.reminderOffset
       )
       if (hasChanges) updateTask(form.id, form)
       completeTask(id)
@@ -295,6 +297,26 @@ export default function TaskDetailModal() {
                 />
               </div>
             </div>
+
+            {/* Lembrete */}
+            {form.dueDate && (
+              <div>
+                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">
+                  <span className="material-symbols-outlined text-[13px] align-middle mr-1" style={{ fontVariationSettings: "'FILL' 1" }}>notifications</span>
+                  Lembrete
+                </label>
+                <select
+                  className="input-field text-sm w-full"
+                  value={form.reminderOffset ?? ''}
+                  onChange={e => setForm(f => ({ ...f, reminderOffset: e.target.value === '' ? null : Number(e.target.value) }))}
+                >
+                  <option value="">Sem lembrete</option>
+                  {REMINDER_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Subtasks */}
             <div>
