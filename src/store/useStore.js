@@ -185,7 +185,7 @@ const useStore = create(
 
           // Garante que a subscription de push está salva no servidor
           if (notificationsSupported() && notificationPermission() === 'granted') {
-            subscribeAndSavePush(expectedUid).catch(() => {})
+            subscribeAndSavePush(expectedUid, session?.access_token).catch(() => {})
           }
 
           if (stats?.lastActiveDate) {

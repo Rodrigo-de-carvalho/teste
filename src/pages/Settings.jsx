@@ -48,8 +48,8 @@ export default function Settings() {
     setPushLoading(true)
     setPushResult(null)
     setPushStep('')
-    const uid = useStore.getState().authUser?.id
-    const result = await subscribeAndSavePush(uid, setPushStep)
+    const { authUser, session } = useStore.getState()
+    const result = await subscribeAndSavePush(authUser?.id, session?.access_token, setPushStep)
     setPushResult(result)
     setPushLoading(false)
     setPushStep('')

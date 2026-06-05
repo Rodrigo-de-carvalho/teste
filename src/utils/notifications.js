@@ -1,7 +1,7 @@
-import { supabase } from '../lib/supabase.js'
-
 const _timers = new Map()
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
+const VAPID_PUBLIC_KEY    = import.meta.env.VITE_VAPID_PUBLIC_KEY
+const SUPABASE_URL        = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY   = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 function urlBase64ToUint8Array(b64) {
   const padding = '='.repeat((4 - b64.length % 4) % 4)
@@ -9,7 +9,7 @@ function urlBase64ToUint8Array(b64) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
 }
 
-export async function subscribeAndSavePush(userId, onStep) {
+export async function subscribeAndSavePush(userId, accessToken, onStep) {
   const report = (s) => { console.warn('[Forje push]', s); onStep?.(s) }
 
   if (!VAPID_PUBLIC_KEY) return { ok: false, error: 'VAPID key ausente no build' }
@@ -53,16 +53,29 @@ export async function subscribeAndSavePush(userId, onStep) {
     step = 'upsert'
     report('4/4 salvando no banco...')
     const json = sub.toJSON()
-    const upsertResult = await Promise.race([
-      supabase.from('push_subscriptions').upsert({
-        user_id:  userId,
-        endpoint: json.endpoint,
-        p256dh:   json.keys.p256dh,
-        auth_key: json.keys.auth,
+    // Usa fetch direto para evitar travamento do cliente Supabase
+    const res = await Promise.race([
+      fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey':        SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Prefer':        'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          user_id:  userId,
+          endpoint: json.endpoint,
+          p256dh:   json.keys.p256dh,
+          auth_key: json.keys.auth,
+        }),
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('banco timeout — a subscription foi registrada mas não salva')), 6000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('banco timeout')), 6000)),
     ])
-    if (upsertResult.error) return { ok: false, error: `Erro ao salvar: ${upsertResult.error.message}` }
+    if (!res.ok) {
+      const msg = await res.text().catch(() => res.status)
+      return { ok: false, error: `Erro ao salvar: ${msg}` }
+    }
     return { ok: true }
   } catch (err) {
     console.warn('[Forje] push failed at', step, err)
