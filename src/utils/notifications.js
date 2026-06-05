@@ -10,10 +10,17 @@ function urlBase64ToUint8Array(b64) {
 }
 
 export async function subscribeAndSavePush(userId) {
-  if (!VAPID_PUBLIC_KEY || !('PushManager' in window) || !('serviceWorker' in navigator)) return
+  if (!VAPID_PUBLIC_KEY) return { ok: false, error: 'VAPID key ausente no build' }
+  if (!('PushManager' in window)) return { ok: false, error: 'PushManager não suportado neste browser' }
+  if (!('serviceWorker' in navigator)) return { ok: false, error: 'ServiceWorker não suportado' }
   try {
     const reg = await navigator.serviceWorker.ready
     let sub   = await reg.pushManager.getSubscription()
+    // Se já há uma subscription mas sem as keys corretas, cancela e recria
+    if (sub) {
+      const json = sub.toJSON()
+      if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly:      true,
@@ -21,14 +28,17 @@ export async function subscribeAndSavePush(userId) {
       })
     }
     const json = sub.toJSON()
-    await supabase.from('push_subscriptions').upsert({
+    const { error } = await supabase.from('push_subscriptions').upsert({
       user_id:  userId,
       endpoint: json.endpoint,
       p256dh:   json.keys.p256dh,
       auth_key: json.keys.auth,
     })
+    if (error) return { ok: false, error: 'Erro ao salvar no banco: ' + error.message }
+    return { ok: true }
   } catch (err) {
     console.warn('[Forje] push subscribe failed:', err)
+    return { ok: false, error: String(err) }
   }
 }
 

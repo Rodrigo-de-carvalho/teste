@@ -8,6 +8,7 @@ import {
   notificationsSupported,
   notificationPermission,
   requestNotificationPermission,
+  subscribeAndSavePush,
 } from '../utils/notifications'
 
 export default function Settings() {
@@ -27,6 +28,8 @@ export default function Settings() {
   const [showInstall, setShowInstall]       = useState(canInstall())
   const [notifPerm, setNotifPerm]           = useState(notificationPermission())
   const [notifLoading, setNotifLoading]     = useState(false)
+  const [pushResult, setPushResult]         = useState(null)
+  const [pushLoading, setPushLoading]       = useState(false)
 
   useEffect(() => {
     const unsub = onInstallReady(() => setShowInstall(true))
@@ -38,6 +41,15 @@ export default function Settings() {
     const granted = await requestNotificationPermission()
     setNotifPerm(granted ? 'granted' : 'denied')
     setNotifLoading(false)
+  }
+
+  async function handleRegisterPush() {
+    setPushLoading(true)
+    setPushResult(null)
+    const uid = useStore.getState().authUser?.id
+    const result = await subscribeAndSavePush(uid)
+    setPushResult(result)
+    setPushLoading(false)
   }
 
   const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -265,12 +277,29 @@ export default function Settings() {
           </div>
 
           {notifPerm === 'granted' ? (
-            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--clr-surface-ctn)' }}>
-              <span className="material-symbols-outlined text-success text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              <div>
-                <p className="text-sm font-medium text-on-surface">Notificações ativadas</p>
-                <p className="text-xs text-on-surface-variant mt-0.5">Você será avisado quando tarefas vencerem</p>
+            <div>
+              <div className="flex items-center gap-3 p-3 rounded-xl mb-3" style={{ background: 'var(--clr-surface-ctn)' }}>
+                <span className="material-symbols-outlined text-success text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                <div>
+                  <p className="text-sm font-medium text-on-surface">Notificações ativadas</p>
+                  <p className="text-xs text-on-surface-variant mt-0.5">Você será avisado quando tarefas vencerem</p>
+                </div>
               </div>
+              <button
+                onClick={handleRegisterPush}
+                disabled={pushLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-all
+                           hover:opacity-90 active:scale-95 disabled:opacity-60"
+                style={{ borderColor: 'var(--clr-primary)', color: 'var(--clr-primary)' }}
+              >
+                <span className="material-symbols-outlined text-[16px]">cloud_sync</span>
+                {pushLoading ? 'Registrando...' : 'Registrar push neste dispositivo'}
+              </button>
+              {pushResult && (
+                <p className={`text-xs mt-2 text-center ${pushResult.ok ? 'text-success' : 'text-error'}`}>
+                  {pushResult.ok ? '✓ Push registrado com sucesso!' : `✗ ${pushResult.error}`}
+                </p>
+              )}
             </div>
           ) : notifPerm === 'denied' ? (
             <div>
