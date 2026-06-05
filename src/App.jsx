@@ -18,6 +18,7 @@ import InstallButton from './components/ui/InstallButton'
 import LgpdBanner from './components/ui/LgpdBanner'
 import UpdateBanner from './components/ui/UpdateBanner'
 import { registerSW } from './utils/swUpdate'
+import NotifHistoryPanel from './components/ui/NotifHistoryPanel'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
 
@@ -28,7 +29,7 @@ const pageVariants = {
 }
 
 export default function App() {
-  const { currentPage, setPage, initTheme, loadAll, setSession, applyRealtimeChange, authUser } = useStore()
+  const { currentPage, setPage, initTheme, loadAll, setSession, applyRealtimeChange, authUser, addNotifToHistory } = useStore()
   const realtimeRef = useRef(null)
   const [offline, setOffline] = useState(!navigator.onLine)
 
@@ -71,6 +72,30 @@ export default function App() {
     })
 
     return () => subscription.unsubscribe()
+  }, [])
+
+  // ── Escuta notificações disparadas (SW broadcast + fallback main-thread) ────────
+  useEffect(() => {
+    const onSwMsg = (event) => {
+      if (event.data?.type === 'NOTIFICATION_SHOWN') {
+        const { taskId, title, body, at } = event.data
+        useStore.getState().addNotifToHistory({ taskId, title, body, at })
+      }
+    }
+    const onCustomEvt = (event) => {
+      const { taskId, title, body, at } = event.detail
+      useStore.getState().addNotifToHistory({ taskId, title, body, at })
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMsg)
+    }
+    window.addEventListener('forje-notif-shown', onCustomEvt)
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onSwMsg)
+      }
+      window.removeEventListener('forje-notif-shown', onCustomEvt)
+    }
   }, [])
 
   // ── Realtime: sincroniza com outros dispositivos ─────────────────────────────
@@ -165,6 +190,7 @@ export default function App() {
       <InstallButton />
       <LgpdBanner />
       <UpdateBanner />
+      <NotifHistoryPanel />
     </>
   )
 }

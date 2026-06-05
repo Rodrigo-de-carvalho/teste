@@ -78,6 +78,8 @@ const useStore = create(
       xpToast:              null,
       levelUpModal:     null,
       editingTask:      null,
+      notifHistoryOpen: false,
+      notifHistory:     [],  // [{ id, taskId, title, body, at, read }]
 
       // ── Theme ────────────────────────────────────────────────────────────────────
       toggleDarkMode: () => {
@@ -275,6 +277,7 @@ const useStore = create(
           id: tempId, title: data.title.trim(), notes: data.notes || '',
           priority: data.priority || 'medium', project: data.project || 'Geral',
           dueDate: data.dueDate || null, dueTime: data.dueTime || null,
+          reminderOffset: data.reminderOffset ?? null,
           completed: false, completedAt: null,
           createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,
           subtasks: [],
@@ -520,6 +523,16 @@ const useStore = create(
         return { xp, level }
       },
 
+      setNotifHistoryOpen: (v) => set({ notifHistoryOpen: v }),
+      addNotifToHistory: (entry) => set(s => ({
+        notifHistory: [
+          { id: `n${Date.now()}`, read: false, ...entry },
+          ...s.notifHistory,
+        ].slice(0, 50),
+      })),
+      markNotifsRead:    () => set(s => ({ notifHistory: s.notifHistory.map(n => ({ ...n, read: true })) })),
+      clearNotifHistory: () => set({ notifHistory: [] }),
+
       clearXpToast:      () => set({ xpToast: null }),
       clearLevelUpModal: () => set({ levelUpModal: null }),
 
@@ -534,18 +547,20 @@ const useStore = create(
     {
       name: 'forge-v2',
       partialize: (s) => ({
-        darkMode:    s.darkMode,
-        focusTaskId: s.focusTaskId,
-        tasks:       s.tasks,
-        user:        { xp: s.user.xp, level: s.user.level, streak: s.user.streak, lastActiveDate: s.user.lastActiveDate },
+        darkMode:     s.darkMode,
+        focusTaskId:  s.focusTaskId,
+        tasks:        s.tasks,
+        user:         { xp: s.user.xp, level: s.user.level, streak: s.user.streak, lastActiveDate: s.user.lastActiveDate },
+        notifHistory: s.notifHistory,
       }),
       // Merge profundo: evita que user.xp sobrescreva o objeto user inteiro
       merge: (persisted, current) => ({
         ...current,
-        darkMode:    persisted.darkMode    ?? current.darkMode,
-        focusTaskId: persisted.focusTaskId ?? current.focusTaskId,
-        tasks:       persisted.tasks       ?? current.tasks,
-        user:        { ...current.user, ...(persisted.user ?? {}) },
+        darkMode:     persisted.darkMode     ?? current.darkMode,
+        focusTaskId:  persisted.focusTaskId  ?? current.focusTaskId,
+        tasks:        persisted.tasks        ?? current.tasks,
+        user:         { ...current.user, ...(persisted.user ?? {}) },
+        notifHistory: persisted.notifHistory ?? [],
       }),
     }
   )

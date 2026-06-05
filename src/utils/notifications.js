@@ -44,9 +44,14 @@ function swController() {
 function showBrowserNotification(title, body, tag) {
   const sw = swController()
   if (sw) {
+    // History gravado pelo broadcast que o SW envia de volta
     sw.postMessage({ type: 'SHOW_NOTIFICATION', title, body, tag })
   } else {
     new Notification(title, { body, icon: '/icon-192.png', tag })
+    // Sem SW: dispara evento para o App registrar no histórico
+    window.dispatchEvent(new CustomEvent('forje-notif-shown', {
+      detail: { taskId: tag, title, body, at: Date.now() }
+    }))
   }
 }
 
@@ -83,13 +88,13 @@ export function scheduleTaskNotification(task) {
 
   cancelTaskNotification(task.id)
 
-  const now        = Date.now()
-  const TWO_HOURS  = 2 * 60 * 60 * 1000
+  const now             = Date.now()
+  const CATCH_UP_WINDOW = 24 * 60 * 60 * 1000  // 24h — mostra ao abrir o app se perdeu enquanto estava fechado
   const title      = `⏰ ${task.title}`
   const body       = buildBody(task)
 
-  // Catch-up: lembrete que passou nas últimas 2h — notifica imediatamente
-  if (reminderMs > now - TWO_HOURS && reminderMs <= now) {
+  // Catch-up: lembrete que passou nas últimas 24h — notifica imediatamente ao abrir o app
+  if (reminderMs > now - CATCH_UP_WINDOW && reminderMs <= now) {
     showBrowserNotification(title, body, task.id)
     return
   }

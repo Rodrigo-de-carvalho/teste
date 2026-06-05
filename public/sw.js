@@ -1,4 +1,4 @@
-const CACHE = 'forje-v6'
+const CACHE = 'forje-v7'
 const ASSETS_TO_CACHE = ['/']
 let focusTimerTimeout = null
 const scheduledNotifs = new Map() // taskId -> timeoutId
@@ -35,6 +35,11 @@ self.addEventListener('fetch', (event) => {
   )
 })
 
+async function broadcastNotifShown(taskId, title, body) {
+  const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  list.forEach(c => c.postMessage({ type: 'NOTIFICATION_SHOWN', taskId, title, body, at: Date.now() }))
+}
+
 // Recebe pedido de notificação enviado pelo app
 self.addEventListener('message', (event) => {
   // Agenda notificação de fim de sessão de foco
@@ -46,6 +51,7 @@ self.addEventListener('message', (event) => {
       self.registration.showNotification(title, {
         body, icon: '/icon-192.png', badge: '/icon-192.png',
         tag: 'forge-focus', renotify: true, requireInteraction: false,
+        vibrate: [200, 100, 200],
       })
     }, delayMs)
     return
@@ -60,12 +66,16 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SCHEDULE_NOTIFICATION') {
     const { id, delayMs, title, body } = event.data
     if (scheduledNotifs.has(id)) clearTimeout(scheduledNotifs.get(id))
-    const tid = setTimeout(() => {
+    const tid = setTimeout(async () => {
       scheduledNotifs.delete(id)
-      self.registration.showNotification(title, {
+      await self.registration.showNotification(title, {
         body, icon: '/icon-192.png', badge: '/icon-192.png',
-        tag: id, renotify: true, requireInteraction: false,
+        tag: id, renotify: true,
+        requireInteraction: true,
+        vibrate: [300, 100, 300, 100, 300],
+        data: { taskId: id },
       })
+      broadcastNotifShown(id, title, body)
     }, delayMs)
     scheduledNotifs.set(id, tid)
     return
@@ -82,12 +92,14 @@ self.addEventListener('message', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon:             '/icon-192.png',
-      badge:            '/icon-192.png',
+      icon:   '/icon-192.png',
+      badge:  '/icon-192.png',
       tag,
-      renotify:         true,
-      requireInteraction: false,
-    })
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [300, 100, 300, 100, 300],
+      data: { taskId: tag },
+    }).then(() => broadcastNotifShown(tag, title, body))
   )
 })
 

@@ -4,7 +4,8 @@ import { todayString } from '../../utils/dates'
 import { isValidAvatarUrl } from '../../lib/supabase'
 
 export default function TopBar() {
-  const { setSidebarOpen, setQuickCaptureOpen, setPage, currentPage, darkMode, toggleDarkMode, user } = useStore()
+  const { setSidebarOpen, setQuickCaptureOpen, setPage, currentPage, darkMode, toggleDarkMode, user, notifHistory, setNotifHistoryOpen, markNotifsRead } = useStore()
+  const unread = notifHistory.filter(n => !n.read).length
 
   const titles = {
     dashboard: 'Dashboard',
@@ -74,6 +75,26 @@ export default function TopBar() {
             style={{ background: 'var(--clr-surface-ctn)', color: 'var(--clr-on-variant)' }}>
             Ctrl+K
           </kbd>
+        </button>
+
+        {/* Sino de notificações */}
+        <button
+          onClick={() => { markNotifsRead(); setNotifHistoryOpen(true) }}
+          className="w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-200 text-on-surface-variant hover:text-primary relative"
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--clr-secondary-ctn)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          aria-label="Histórico de notificações"
+          title="Histórico de notificações"
+        >
+          <span className="material-symbols-outlined text-[20px]"
+            style={unread > 0 ? { fontVariationSettings: "'FILL' 1" } : {}}>
+            notifications
+          </span>
+          {unread > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-error text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
         </button>
 
         {/* Dark mode toggle */}
