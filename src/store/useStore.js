@@ -512,11 +512,11 @@ const useStore = create(
       // ── Helpers ─────────────────────────────────────────────────────────────────────────
       recalcXpFromTasks: async () => {
         const { tasks, authUser } = get()
-        if (!authUser?.id) return null
+        if (!authUser?.id) return { xp: 0, level: 1 }
         const xp    = tasks.filter(t => t.completed).reduce((sum, t) => sum + (XP_TABLE[t.priority] ?? 20), 0)
         const level = levelFromXp(xp)
         set(s => ({ user: { ...s.user, xp, level } }))
-        await supabase.from('user_stats').upsert({ id: authUser.id, xp, level })
+        try { await supabase.from('user_stats').upsert({ id: authUser.id, xp, level }) } catch {}
         return { xp, level }
       },
 
