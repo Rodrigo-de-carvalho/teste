@@ -107,15 +107,6 @@ const useStore = create(
               user: { ...s.user, ...meta } }))
       },
 
-      initAuth: async () => {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          await get().loadAll(session)
-        } else {
-          set({ currentPage: 'login', isLoading: false })
-        }
-      },
-
       loadAll: async (session) => {
         const expectedUid   = session.user.id
         const meta          = getUserMeta(session.user)
@@ -139,14 +130,21 @@ const useStore = create(
           // Aborta se o usuário mudou enquanto aguardávamos o Supabase
           if (get().authUser?.id !== expectedUid) return
 
-          console.log('[Forje] user_stats do Supabase:', statsRes.data, statsRes.error)
-          const stats = dbStatsToJs(statsRes.data)
+          const stats = statsRes.error ? null : dbStatsToJs(statsRes.data)
           const tasks = (tasksRes.data || []).map(dbTaskToJs)
+
+          // Valida focusTaskId — descarta se apontar para tarefa concluída ou inexistente
+          const savedFocusId = stats?.focusTaskId
+          const validFocusId = tasks.find(t => t.id === savedFocusId && !t.completed)?.id || null
+
           set((s) => ({
-            user: { ...s.user, ...(stats || {}) },
+            user: { ...s.user, ...(stats ?? {}) },
             tasks,
-            focusTaskId: stats?.focusTaskId || (tasks.find(t => !t.completed)?.id || null),
+            focusTaskId: validFocusId || (tasks.find(t => !t.completed)?.id || null),
           }))
+
+          // Reagenda notificações após carregar tarefas (timers são perdidos ao fechar o app)
+          tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} })
 
           if (stats?.lastActiveDate) {
             const yest = new Date(); yest.setDate(yest.getDate() - 1)
@@ -171,15 +169,20 @@ const useStore = create(
       deleteAccount: async () => {
         const uid = get().authUser?.id
         if (!uid) return
-        set(LOGGED_OUT_STATE)
+
         try {
+          // Deleta dados do app em paralelo
           await Promise.all([
             supabase.from('tasks').delete().eq('user_id', uid),
             supabase.from('user_stats').delete().eq('id', uid),
           ])
+          // Deleta a conta no Auth via Edge Function (roda com service role key no servidor)
+          await supabase.functions.invoke('delete-account')
         } catch (err) {
           if (import.meta.env.DEV) console.error('[Forje] deleteAccount failed:', err)
         }
+
+        set(LOGGED_OUT_STATE)
         await supabase.auth.signOut().catch(() => {})
       },
 
@@ -388,12 +391,29 @@ const useStore = create(
 
         const uid = get().authUser?.id
         if (uid) {
-          const [, statsResult] = await Promise.all([
+          const [taskResult, statsResult] = await Promise.all([
             supabase.from('tasks').update({ completed: true, completed_at: now }).eq('id', id),
             supabase.from('user_stats').upsert({ id: uid, xp: newXp, level: newLevel, streak: newStreak, last_active_date: today }),
           ])
+
+          // Tarefa não salvou — reverte tudo no UI
+          if (taskResult.error) {
+            if (import.meta.env.DEV) console.error('[Forje] completeTask task save failed:', taskResult.error)
+            set((s) => ({
+              tasks: s.tasks.map(t => t.id === id ? { ...t, completed: false, completedAt: null } : t),
+              user:  { ...s.user, xp: user.xp, level: oldLevel, streak: user.streak, lastActiveDate: user.lastActiveDate },
+              xpToast: null,
+              levelUpModal: null,
+            }))
+            return
+          }
+
+          // Tarefa salvou mas XP falhou — tenta uma vez mais
           if (statsResult.error) {
-            console.error('[Forje] completeTask XP save failed:', statsResult.error)
+            if (import.meta.env.DEV) console.error('[Forje] completeTask XP save failed:', statsResult.error)
+            supabase.from('user_stats')
+              .upsert({ id: uid, xp: newXp, level: newLevel, streak: newStreak, last_active_date: today })
+              .catch(() => {})
           }
         }
       },
@@ -492,6 +512,15 @@ const useStore = create(
         darkMode:    s.darkMode,
         focusTaskId: s.focusTaskId,
         tasks:       s.tasks,
+        user:        { xp: s.user.xp, level: s.user.level, streak: s.user.streak, lastActiveDate: s.user.lastActiveDate },
+      }),
+      // Merge profundo: evita que user.xp sobrescreva o objeto user inteiro
+      merge: (persisted, current) => ({
+        ...current,
+        darkMode:    persisted.darkMode    ?? current.darkMode,
+        focusTaskId: persisted.focusTaskId ?? current.focusTaskId,
+        tasks:       persisted.tasks       ?? current.tasks,
+        user:        { ...current.user, ...(persisted.user ?? {}) },
       }),
     }
   )

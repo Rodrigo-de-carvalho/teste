@@ -33,6 +33,8 @@ function getMonthDays(year, month) {
   return days
 }
 
+const isTouchOnly = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches
+
 export default function Planning() {
   const { tasks, updateTask, openQuickCapture, setEditingTask } = useStore()
   const today    = new Date()
@@ -189,7 +191,7 @@ export default function Planning() {
             </span>
           </div>
           <p className="text-on-surface-variant text-sm mb-4">
-            Arraste para um dia do calendário ou clique para editar.
+            {isTouchOnly ? 'Toque para editar e definir a data.' : 'Arraste para um dia do calendário ou clique para editar.'}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {unscheduled.map(task => (

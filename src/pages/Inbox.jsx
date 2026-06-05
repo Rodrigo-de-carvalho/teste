@@ -23,7 +23,7 @@ export default function Inbox() {
   function filterTasks(t) {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filter === 'all')       return !t.completed
-    if (filter === 'today')     return !t.completed && t.dueDate && t.dueDate <= today
+    if (filter === 'today')     return !t.completed && t.dueDate === today
     if (filter === 'upcoming')  return !t.completed && t.dueDate && t.dueDate > today
     if (filter === 'completed') return t.completed
     return true

@@ -5,7 +5,7 @@ import { isValidAvatarUrl } from '../../lib/supabase'
 const NAV = [
   { id: 'dashboard', icon: 'bolt',              label: 'Foco'    },
   { id: 'inbox',     icon: 'inbox',             label: 'Entrada' },
-  { id: 'planning',  icon: 'calendar_view_week', label: 'Semana'  },
+  { id: 'planning',  icon: 'calendar_view_week', label: 'Planejar' },
   { id: 'settings',  icon: 'account_circle',    label: 'Perfil'  },
 ]
 
@@ -65,7 +65,7 @@ export default function BottomNav() {
         >
           calendar_view_week
         </span>
-        <span className="text-[10px] font-label font-medium uppercase tracking-wider mt-0.5">Semana</span>
+        <span className="text-[10px] font-label font-medium uppercase tracking-wider mt-0.5">Planejar</span>
       </button>
 
       {/* Perfil / Settings — mostra avatar real se disponível */}

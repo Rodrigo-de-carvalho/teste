@@ -45,7 +45,7 @@ export default function TopBar() {
         {['dashboard', 'inbox', 'planning', 'insights'].map((p) => (
           <button
             key={p}
-            onClick={() => useStore.getState().setPage(p)}
+            onClick={() => setPage(p)}
             className={`px-4 py-2 rounded-lg text-sm font-label font-medium transition-all duration-200 ${
               currentPage === p ? 'bg-primary/10 text-primary' : 'text-on-surface-variant'
             }`}

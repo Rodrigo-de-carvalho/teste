@@ -14,6 +14,8 @@ export default function Settings() {
   const { user, darkMode, toggleDarkMode, logout, deleteAccount, resetXp } = useStore()
   const [name, setName]             = useState(user.name || '')
   const [saving, setSaving]         = useState(false)
+
+  useEffect(() => { setName(user.name || '') }, [user.name])
   const [saved, setSaved]           = useState(false)
   const [deleting, setDeleting]     = useState(false)
   const [confirmDelete, setConfirmDelete]   = useState(false)
@@ -102,7 +104,7 @@ export default function Settings() {
           <div>
             <p className="font-semibold text-on-surface">{user.name}</p>
             <p className="text-on-surface-variant text-sm">{user.email}</p>
-            {user.avatar && (
+            {user.avatar?.includes('googleusercontent.com') && (
               <p className="text-on-surface-variant/50 text-xs mt-1 flex items-center gap-1">
                 <span className="material-symbols-outlined text-[12px]">verified</span>
                 Foto sincronizada com o Google

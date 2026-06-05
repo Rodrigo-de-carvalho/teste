@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { formatDate, isOverdue } from '../../utils/dates'
@@ -14,7 +14,15 @@ export default function TaskCard({ task, compact = false }) {
   const { completeTask, uncompleteTask, setEditingTask } = useStore()
   const [justCompleted, setJustCompleted]     = useState(false)
   const [confirmUncheck, setConfirmUncheck]   = useState(false)
-  const uncheckTimerRef = useRef(null)
+  const uncheckTimerRef  = useRef(null)
+  const completeTimerRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(completeTimerRef.current)
+      clearTimeout(uncheckTimerRef.current)
+    }
+  }, [])
 
   const cfg     = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium
   const overdue = !task.completed && isOverdue(task.dueDate)
@@ -28,7 +36,7 @@ export default function TaskCard({ task, compact = false }) {
       uncheckTimerRef.current = setTimeout(() => setConfirmUncheck(false), 5000)
     } else {
       setJustCompleted(true)
-      setTimeout(() => completeTask(task.id), 400)
+      completeTimerRef.current = setTimeout(() => completeTask(task.id), 400)
     }
   }
 

@@ -33,7 +33,7 @@ export default function AuthCallback() {
     }
 
     handle()
-  }, [])
+  }, [loadAll, setPage])
 
   return (
     <div className="min-h-dvh flex items-center justify-center" style={{ background: 'var(--clr-bg)' }}>

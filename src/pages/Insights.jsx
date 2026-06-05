@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import useStore from '../store/useStore'
-import { getLast7Days, formatFocusTime } from '../utils/dates'
+import { getLast7Days, formatFocusTime, localIso } from '../utils/dates'
 import { XP_TABLE } from '../store/useStore'
 
 export default function Insights() {
@@ -99,7 +99,7 @@ export default function Insights() {
                     />
                   </div>
                   <span className={`text-[10px] font-label uppercase tracking-wider
-                    ${new Date().toISOString().startsWith(d.isoDate) ? 'text-primary font-bold' : 'text-on-surface-variant/60'}`}>
+                    ${localIso() === d.isoDate ? 'text-primary font-bold' : 'text-on-surface-variant/60'}`}>
                     {d.label}
                   </span>
                 </div>

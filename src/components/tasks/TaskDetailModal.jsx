@@ -15,6 +15,7 @@ export default function TaskDetailModal() {
   useEffect(() => {
     if (editingTask) {
       setForm({ ...editingTask })
+      setNewSub('')
       setConfirmDelete(false)
       setConfirmUncheck(false)
     }
@@ -33,11 +34,19 @@ export default function TaskDetailModal() {
 
   function handleToggleComplete() {
     if (editingTask.completed) {
-      // Desmarcar subtrai XP — pede confirmação
       setConfirmUncheck(true)
     } else {
       const id = editingTask.id
-      if (form && form.title.trim()) updateTask(form.id, form)
+      // Salva alterações do form antes de completar — apenas se algo mudou
+      const hasChanges = form && form.title.trim() && (
+        form.title    !== editingTask.title    ||
+        form.notes    !== editingTask.notes    ||
+        form.priority !== editingTask.priority ||
+        form.project  !== editingTask.project  ||
+        form.dueDate  !== editingTask.dueDate  ||
+        form.dueTime  !== editingTask.dueTime
+      )
+      if (hasChanges) updateTask(form.id, form)
       completeTask(id)
       setEditingTask(null)
     }

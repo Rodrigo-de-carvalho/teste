@@ -94,7 +94,7 @@ export default function QuickCapture() {
           className="fixed z-[91] w-full
                      bottom-0 left-0 right-0
                      md:bottom-auto md:top-[12vh] md:left-1/2 md:-translate-x-1/2 md:max-w-lg md:px-4"
-          style={{ bottom: bottomOffset }}
+          style={bottomOffset > 0 ? { bottom: bottomOffset } : undefined}
           initial={{ opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 60 }}
