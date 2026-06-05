@@ -13,33 +13,44 @@ export async function subscribeAndSavePush(userId) {
   if (!VAPID_PUBLIC_KEY) return { ok: false, error: 'VAPID key ausente no build' }
   if (!('PushManager' in window)) return { ok: false, error: 'PushManager não suportado neste browser' }
   if (!('serviceWorker' in navigator)) return { ok: false, error: 'ServiceWorker não suportado' }
-  try {
-    const reg = await navigator.serviceWorker.ready
-    let sub   = await reg.pushManager.getSubscription()
-    // Se já há uma subscription mas sem as keys corretas, cancela e recria
-    if (sub) {
+
+  async function _work() {
+    let step = 'sw.ready'
+    try {
+      const reg = await navigator.serviceWorker.ready
+      step = 'getSubscription'
+      let sub = await reg.pushManager.getSubscription()
+      if (sub) {
+        const json = sub.toJSON()
+        if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
+      }
+      step = 'subscribe'
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        })
+      }
+      step = 'upsert'
       const json = sub.toJSON()
-      if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
-    }
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly:      true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      const { error } = await supabase.from('push_subscriptions').upsert({
+        user_id:  userId,
+        endpoint: json.endpoint,
+        p256dh:   json.keys.p256dh,
+        auth_key: json.keys.auth,
       })
+      if (error) return { ok: false, error: `upsert: ${error.message}` }
+      return { ok: true }
+    } catch (err) {
+      console.warn('[Forje] push subscribe failed at', step, err)
+      return { ok: false, error: `${step}: ${String(err)}` }
     }
-    const json = sub.toJSON()
-    const { error } = await supabase.from('push_subscriptions').upsert({
-      user_id:  userId,
-      endpoint: json.endpoint,
-      p256dh:   json.keys.p256dh,
-      auth_key: json.keys.auth,
-    })
-    if (error) return { ok: false, error: 'Erro ao salvar no banco: ' + error.message }
-    return { ok: true }
-  } catch (err) {
-    console.warn('[Forje] push subscribe failed:', err)
-    return { ok: false, error: String(err) }
   }
+
+  const timeout = new Promise(resolve =>
+    setTimeout(() => resolve({ ok: false, error: 'Timeout em sw.ready — feche outras abas do app e tente de novo' }), 12000)
+  )
+  return Promise.race([_work(), timeout])
 }
 
 const PRIORITY_LABEL = {
