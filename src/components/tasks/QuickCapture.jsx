@@ -10,7 +10,7 @@ const PRIORITIES = [
   { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
 ]
 
-const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', dueTime: '', reminderOffset: null }
+const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null }
 
 export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
@@ -194,7 +194,16 @@ export default function QuickCapture() {
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Hora</label>
+                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Início</label>
+                        <input
+                          type="time"
+                          className="input-field text-sm"
+                          value={form.startTime}
+                          onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Término</label>
                         <input
                           type="time"
                           className="input-field text-sm"

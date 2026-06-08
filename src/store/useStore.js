@@ -301,7 +301,7 @@ const useStore = create(
         const tempTask = {
           id: tempId, title: data.title.trim(), notes: data.notes || '',
           priority: data.priority || 'medium', project: data.project || 'Geral',
-          dueDate: data.dueDate || null, dueTime: data.dueTime || null,
+          dueDate: data.dueDate || null, startTime: data.startTime || null, dueTime: data.dueTime || null,
           reminderOffset: data.reminderOffset ?? null,
           completed: false, completedAt: null,
           createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,

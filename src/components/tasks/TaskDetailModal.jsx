@@ -45,6 +45,7 @@ export default function TaskDetailModal() {
         form.priority       !== editingTask.priority       ||
         form.project        !== editingTask.project        ||
         form.dueDate        !== editingTask.dueDate        ||
+        form.startTime      !== editingTask.startTime      ||
         form.dueTime        !== editingTask.dueTime        ||
         form.reminderOffset !== editingTask.reminderOffset
       )
@@ -276,19 +277,28 @@ export default function TaskDetailModal() {
               </div>
             </div>
 
-            {/* Due date */}
+            {/* Due date + horários */}
+            <div>
+              <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Data</label>
+              <input
+                type="date"
+                className="input-field text-sm"
+                value={form.dueDate || ''}
+                onChange={e => setForm(f => ({ ...f, dueDate: e.target.value || null }))}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Data</label>
+                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Início</label>
                 <input
-                  type="date"
+                  type="time"
                   className="input-field text-sm"
-                  value={form.dueDate || ''}
-                  onChange={e => setForm(f => ({ ...f, dueDate: e.target.value || null }))}
+                  value={form.startTime || ''}
+                  onChange={e => setForm(f => ({ ...f, startTime: e.target.value || null }))}
                 />
               </div>
               <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Horário</label>
+                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Término</label>
                 <input
                   type="time"
                   className="input-field text-sm"
@@ -297,6 +307,21 @@ export default function TaskDetailModal() {
                 />
               </div>
             </div>
+            {/* Duração calculada */}
+            {form.startTime && form.dueTime && (() => {
+              const [sh, sm] = form.startTime.split(':').map(Number)
+              const [eh, em] = form.dueTime.split(':').map(Number)
+              const diff = (eh * 60 + em) - (sh * 60 + sm)
+              if (diff <= 0) return null
+              const h = Math.floor(diff / 60)
+              const m = diff % 60
+              return (
+                <p className="text-xs text-primary font-label flex items-center gap-1 -mt-2">
+                  <span className="material-symbols-outlined text-[13px]">schedule</span>
+                  Duração: {h > 0 ? `${h}h` : ''}{m > 0 ? ` ${m}min` : ''}
+                </p>
+              )
+            })()}
 
             {/* Lembrete */}
             {form.dueDate && (

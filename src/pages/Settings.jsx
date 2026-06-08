@@ -9,6 +9,7 @@ import {
   notificationPermission,
   requestNotificationPermission,
   subscribeAndSavePush,
+  sendTestNotification,
 } from '../utils/notifications'
 
 export default function Settings() {
@@ -31,6 +32,7 @@ export default function Settings() {
   const [pushResult, setPushResult]         = useState(null)
   const [pushLoading, setPushLoading]       = useState(false)
   const [pushStep, setPushStep]             = useState('')
+  const [testSent, setTestSent]             = useState(false)
 
   useEffect(() => {
     const unsub = onInstallReady(() => setShowInstall(true))
@@ -49,10 +51,19 @@ export default function Settings() {
     setPushResult(null)
     setPushStep('')
     const { authUser, session } = useStore.getState()
-    const result = await subscribeAndSavePush(authUser?.id, session?.access_token, setPushStep)
+    // forceRefresh=true garante novo endpoint caso o anterior tenha expirado
+    const result = await subscribeAndSavePush(authUser?.id, session?.access_token, setPushStep, true)
     setPushResult(result)
     setPushLoading(false)
     setPushStep('')
+  }
+
+  async function handleTestNotification() {
+    const sent = await sendTestNotification()
+    if (sent) {
+      setTestSent(true)
+      setTimeout(() => setTestSent(false), 3000)
+    }
   }
 
   const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -292,17 +303,26 @@ export default function Settings() {
                 onClick={handleRegisterPush}
                 disabled={pushLoading}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-all
-                           hover:opacity-90 active:scale-95 disabled:opacity-60"
+                           hover:opacity-90 active:scale-95 disabled:opacity-60 mb-2"
                 style={{ borderColor: 'var(--clr-primary)', color: 'var(--clr-primary)' }}
               >
                 <span className="material-symbols-outlined text-[16px]">cloud_sync</span>
-                {pushLoading ? (pushStep || 'Iniciando...') : 'Registrar push neste dispositivo'}
+                {pushLoading ? (pushStep || 'Iniciando...') : 'Reativar push neste dispositivo'}
               </button>
               {pushResult && (
-                <p className={`text-xs mt-2 text-center ${pushResult.ok ? 'text-success' : 'text-error'}`}>
+                <p className={`text-xs mb-2 text-center ${pushResult.ok ? 'text-success' : 'text-error'}`}>
                   {pushResult.ok ? '✓ Push registrado com sucesso!' : `✗ ${pushResult.error}`}
                 </p>
               )}
+              <button
+                onClick={handleTestNotification}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-all
+                           hover:opacity-90 active:scale-95"
+                style={{ borderColor: 'var(--clr-outline-var)', color: 'var(--clr-on-surface-variant)' }}
+              >
+                <span className="material-symbols-outlined text-[16px]">notifications_active</span>
+                {testSent ? '✓ Notificação enviada!' : 'Testar notificação agora'}
+              </button>
             </div>
           ) : notifPerm === 'denied' ? (
             <div>

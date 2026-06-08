@@ -9,7 +9,8 @@ function urlBase64ToUint8Array(b64) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
 }
 
-export async function subscribeAndSavePush(userId, accessToken, onStep) {
+// forceRefresh=true: cancela subscription existente antes de criar nova (garante endpoint fresco)
+export async function subscribeAndSavePush(userId, accessToken, onStep, forceRefresh = false) {
   const report = (s) => { console.warn('[Forje push]', s); onStep?.(s) }
 
   if (!VAPID_PUBLIC_KEY) return { ok: false, error: 'VAPID key ausente no build' }
@@ -33,27 +34,31 @@ export async function subscribeAndSavePush(userId, accessToken, onStep) {
       reg.pushManager.getSubscription(),
       new Promise((_, rej) => setTimeout(() => rej(new Error('getSubscription timeout')), 5000)),
     ])
-    if (sub) {
+
+    if (sub && forceRefresh) {
+      // Força criação de subscription nova para corrigir endpoints expirados
+      await sub.unsubscribe().catch(() => {})
+      sub = null
+    } else if (sub) {
       const json = sub.toJSON()
-      if (!json.keys?.p256dh) { await sub.unsubscribe(); sub = null }
+      if (!json.keys?.p256dh) { await sub.unsubscribe().catch(() => {}); sub = null }
     }
 
     step = 'subscribe'
-    report('3/4 registrando no FCM...')
+    report('3/4 registrando no servidor push...')
     if (!sub) {
       sub = await Promise.race([
         reg.pushManager.subscribe({
           userVisibleOnly:      true,
           applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('FCM timeout — verifique sua conexão')), 10000)),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout — verifique sua conexão')), 10000)),
       ])
     }
 
     step = 'upsert'
     report('4/4 salvando no banco...')
     const json = sub.toJSON()
-    // Usa fetch direto para evitar travamento do cliente Supabase
     const res = await Promise.race([
       fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
         method:  'POST',
@@ -81,6 +86,25 @@ export async function subscribeAndSavePush(userId, accessToken, onStep) {
     console.warn('[Forje] push failed at', step, err)
     return { ok: false, error: `${step}: ${String(err)}` }
   }
+}
+
+export async function sendTestNotification() {
+  if (!notificationsSupported() || Notification.permission !== 'granted') return false
+  const sw = swController()
+  if (sw) {
+    sw.postMessage({
+      type: 'SHOW_NOTIFICATION',
+      title: '⏰ Forje — Teste',
+      body:  'As notificações estão funcionando corretamente!',
+      tag:   'forje-test-' + Date.now(),
+    })
+  } else {
+    new Notification('⏰ Forje — Teste', {
+      body: 'As notificações estão funcionando corretamente!',
+      icon: '/icon-192.png',
+    })
+  }
+  return true
 }
 
 const PRIORITY_LABEL = {

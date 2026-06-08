@@ -24,8 +24,9 @@ export function dbTaskToJs(row) {
     project:     row.project      ?? 'Geral',
     // Supabase pode retornar date como "YYYY-MM-DDT..." ou time como "HH:MM:SS"
     // — truncamos para os formatos esperados pelos inputs HTML
-    dueDate:        row.due_date  ? String(row.due_date).slice(0, 10) : null,
-    dueTime:        row.due_time  ? String(row.due_time).slice(0, 5)  : null,
+    dueDate:        row.due_date   ? String(row.due_date).slice(0, 10)  : null,
+    startTime:      row.start_time ? String(row.start_time).slice(0, 5) : null,
+    dueTime:        row.due_time   ? String(row.due_time).slice(0, 5)   : null,
     reminderOffset: row.reminder_offset ?? null,
     completed:      row.completed    ?? false,
     completedAt: row.completed_at ?? null,
@@ -45,8 +46,9 @@ export function jsTaskToDb(data) {
   if (data.notes       !== undefined) db.notes        = data.notes
   if (data.priority    !== undefined) db.priority     = data.priority
   if (data.project     !== undefined) db.project      = data.project
-  if (data.dueDate        !== undefined) db.due_date       = data.dueDate
-  if (data.dueTime        !== undefined) db.due_time       = data.dueTime
+  if (data.dueDate        !== undefined) db.due_date        = data.dueDate
+  if (data.startTime      !== undefined) db.start_time      = data.startTime || null
+  if (data.dueTime        !== undefined) db.due_time        = data.dueTime
   if (data.reminderOffset !== undefined) db.reminder_offset = data.reminderOffset ?? null
   if (data.completed      !== undefined) db.completed      = data.completed
   if (data.completedAt !== undefined) db.completed_at = data.completedAt

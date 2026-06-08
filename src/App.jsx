@@ -19,6 +19,7 @@ import LgpdBanner from './components/ui/LgpdBanner'
 import UpdateBanner from './components/ui/UpdateBanner'
 import { registerSW } from './utils/swUpdate'
 import NotifHistoryPanel from './components/ui/NotifHistoryPanel'
+import { scheduleTaskNotification } from './utils/notifications'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
 
@@ -97,6 +98,22 @@ export default function App() {
       window.removeEventListener('forje-notif-shown', onCustomEvt)
     }
   }, [])
+
+  // ── Reagenda notificações ao voltar ao app (corrige timers perdidos quando SW é reiniciado) ──
+  useEffect(() => {
+    if (!authUser?.id) return
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      const { tasks } = useStore.getState()
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+          .then(() => tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} }))
+          .catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [authUser?.id])
 
   // ── Realtime: sincroniza com outros dispositivos ─────────────────────────────
   useEffect(() => {

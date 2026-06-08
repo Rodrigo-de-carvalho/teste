@@ -12,7 +12,8 @@ create table if not exists public.tasks (
   priority     text default 'medium' check (priority in ('critical','high','medium','low')),
   project      text default 'Geral',
   due_date        text,
-  due_time        text,
+  start_time      text,                   -- horário de início da tarefa (HH:MM)
+  due_time        text,                   -- horário de término / prazo (HH:MM)
   reminder_offset  integer default null,
   reminder_send_at timestamptz,           -- UTC absoluto do push (calculado pelo cliente)
   reminder_sent_at timestamptz,           -- preenchido após o servidor enviar o push
@@ -22,6 +23,9 @@ create table if not exists public.tasks (
   created_at   timestamptz default now(),
   updated_at   timestamptz default now()
 );
+
+-- ── Migração para bancos existentes (execute no SQL Editor se já criou a tabela) ──
+-- alter table public.tasks add column if not exists start_time text;
 
 -- ── Tabela de subtarefas ─────────────────────────────────────
 create table if not exists public.subtasks (
