@@ -151,7 +151,18 @@ const useStore = create(
           }
 
           const stats = statsRes.error ? null : dbStatsToJs(statsRes.data)
-          const tasks = (tasksRes.data || []).map(dbTaskToJs)
+
+          // Preserva completed:true do estado local quando o DB ainda não confirmou o save
+          // (race condition: user completa tarefa e recarrega antes do Supabase responder)
+          const localTasks = get().tasks
+          const tasks = (tasksRes.data || []).map(row => {
+            const parsed = dbTaskToJs(row)
+            const local  = localTasks.find(l => l.id === parsed.id)
+            if (local?.completed && !parsed.completed) {
+              return { ...parsed, completed: true, completedAt: local.completedAt }
+            }
+            return parsed
+          })
 
           // Lê XP local (localStorage) antes de ser sobrescrito pelo Supabase
           const localXp = get().user.xp
@@ -532,6 +543,11 @@ const useStore = create(
             const existing = get().tasks.find(t => t.id === newRow.id)
             if (!existing) return
             const updated = dbTaskToJs({ ...newRow, subtasks: existing.subtasks || [] })
+            // Não regride completed:true → false via Realtime (evento pode ser de campo diferente)
+            if (existing.completed && !updated.completed) {
+              updated.completed  = true
+              updated.completedAt = existing.completedAt
+            }
             set((s) => ({ tasks: s.tasks.map(t => t.id === newRow.id ? updated : t) }))
           } else if (event === 'DELETE') {
             set((s) => ({ tasks: s.tasks.filter(t => t.id !== oldRow.id) }))
@@ -546,6 +562,24 @@ const useStore = create(
       },
 
       // ── Helpers ─────────────────────────────────────────────────────────────────────────
+      reloadTasks: async () => {
+        const { authUser } = get()
+        if (!authUser?.id) return { ok: false }
+        try {
+          const { data, error } = await supabase
+            .from('tasks')
+            .select('*, subtasks(*)')
+            .eq('user_id', authUser.id)
+            .order('created_at', { ascending: false })
+          if (error) return { ok: false }
+          const tasks = (data || []).map(dbTaskToJs)
+          set({ tasks })
+          return { ok: true, count: tasks.length }
+        } catch {
+          return { ok: false }
+        }
+      },
+
       recalcXpFromTasks: async () => {
         const { tasks, authUser } = get()
         if (!authUser?.id) return { xp: 0, level: 1 }

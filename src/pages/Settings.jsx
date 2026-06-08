@@ -13,7 +13,7 @@ import {
 } from '../utils/notifications'
 
 export default function Settings() {
-  const { user, darkMode, toggleDarkMode, logout, deleteAccount, resetXp, recalcXpFromTasks } = useStore()
+  const { user, darkMode, toggleDarkMode, logout, deleteAccount, resetXp, recalcXpFromTasks, reloadTasks } = useStore()
   const [name, setName]             = useState(user.name || '')
   const [saving, setSaving]         = useState(false)
 
@@ -26,6 +26,8 @@ export default function Settings() {
   const [resetDone, setResetDone]           = useState(false)
   const [recalcing, setRecalcing]           = useState(false)
   const [recalcDone, setRecalcDone]         = useState(null)
+  const [reloading, setReloading]           = useState(false)
+  const [reloadDone, setReloadDone]         = useState(null)
   const [showInstall, setShowInstall]       = useState(canInstall())
   const [notifPerm, setNotifPerm]           = useState(notificationPermission())
   const [notifLoading, setNotifLoading]     = useState(false)
@@ -95,6 +97,17 @@ export default function Settings() {
     setDeleting(true)
     await deleteAccount()
     setDeleting(false)
+  }
+
+  async function handleReloadTasks() {
+    setReloading(true)
+    try {
+      const result = await reloadTasks()
+      setReloadDone(result)
+      setTimeout(() => setReloadDone(null), 4000)
+    } finally {
+      setReloading(false)
+    }
   }
 
   async function handleRecalcXp() {
@@ -209,6 +222,32 @@ export default function Settings() {
             </div>
           ))}
         </div>
+
+        {/* Sincronizar tarefas */}
+        {reloadDone ? (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold mb-3"
+            style={{ background: reloadDone.ok ? 'rgba(76,175,80,0.1)' : 'rgba(211,47,47,0.08)', color: reloadDone.ok ? 'var(--clr-success, #4caf50)' : 'var(--clr-error)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              {reloadDone.ok ? 'check_circle' : 'error'}
+            </span>
+            {reloadDone.ok ? `Tarefas sincronizadas (${reloadDone.count})` : 'Erro ao sincronizar — tente novamente'}
+          </motion.div>
+        ) : (
+          <button
+            onClick={handleReloadTasks}
+            disabled={reloading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold
+                       text-primary transition-all hover:bg-primary/10 mb-3 disabled:opacity-50"
+            style={{ borderColor: 'rgba(var(--clr-primary-rgb,103,80,164),0.4)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]">sync</span>
+            {reloading ? 'Sincronizando...' : 'Sincronizar tarefas com o banco'}
+          </button>
+        )}
 
         {/* Recuperar XP */}
         {recalcDone ? (
