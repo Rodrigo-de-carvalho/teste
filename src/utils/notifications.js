@@ -162,16 +162,30 @@ function showBrowserNotification(title, body, tag) {
   }
 }
 
+// Horário de referência do lembrete: 'start' (início) ou 'end' (término).
+// Default 'start' — o mais lógico (avisa antes de COMEÇAR a tarefa).
+// Cai para o outro horário disponível, ou 09:00, se o escolhido não existir.
+export function reminderAnchorTime(task) {
+  const anchor = task.reminderAnchor === 'end' ? 'end' : 'start'
+  if (anchor === 'start') return task.startTime || task.dueTime || '09:00'
+  return task.dueTime || task.startTime || '09:00'
+}
+
 function buildBody(task) {
   const priority = PRIORITY_LABEL[task.priority] || ''
-  if (task.dueTime) return `${priority} · vence às ${task.dueTime}`
+  const anchor   = task.reminderAnchor === 'end' ? 'end' : 'start'
+  if (task.startTime || task.dueTime) {
+    const time = reminderAnchorTime(task)
+    const verb = anchor === 'start' ? 'começa às' : 'vence às'
+    return `${priority} · ${verb} ${time}`
+  }
   return priority
 }
 
 // Calcula o timestamp (ms) em que o lembrete deve disparar
 function calcReminderMs(task) {
   if (!task.dueDate || task.reminderOffset == null) return null
-  const time  = task.dueTime || '09:00'
+  const time  = reminderAnchorTime(task)
   const dueMs = new Date(`${task.dueDate}T${time}`).getTime()
   if (isNaN(dueMs)) return null
   return dueMs - task.reminderOffset * 60 * 1000
@@ -182,7 +196,7 @@ export function scheduleTaskNotification(task) {
 
   if (isAndroid()) {
     if (!task.dueDate || task.reminderOffset == null) return
-    const time      = task.dueTime || '09:00'
+    const time      = reminderAnchorTime(task)
     const reminderMs = new Date(`${task.dueDate}T${time}`).getTime() - task.reminderOffset * 60 * 1000
     window.Android?.scheduleNotification?.(task.id, `⏰ ${task.title}`, buildBody(task), reminderMs)
     return

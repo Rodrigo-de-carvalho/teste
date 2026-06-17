@@ -1,4 +1,4 @@
-const CACHE = 'forje-v8'
+const CACHE = 'forje-v9'
 const ASSETS_TO_CACHE = ['/']
 let focusTimerTimeout = null
 const scheduledNotifs = new Map() // taskId -> timeoutId
@@ -44,6 +44,11 @@ async function broadcastNotifShown(taskId, title, body) {
 
 // Recebe pedido de notificação enviado pelo app
 self.addEventListener('message', (event) => {
+  // Ativa imediatamente o novo SW quando o usuário toca em "Atualizar"
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+    return
+  }
   // Agenda notificação de fim de sessão de foco
   if (event.data?.type === 'SCHEDULE_FOCUS_NOTIFICATION') {
     if (focusTimerTimeout) clearTimeout(focusTimerTimeout)

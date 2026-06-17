@@ -1,8 +1,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
-import { scheduleTaskNotification, cancelTaskNotification, subscribeAndSavePush, notificationsSupported, notificationPermission } from '../utils/notifications.js'
+import { scheduleTaskNotification, cancelTaskNotification, subscribeAndSavePush, notificationsSupported, notificationPermission, reminderAnchorTime } from '../utils/notifications.js'
 import { localIso } from '../utils/dates.js'
+
+// Degradação graciosa: se a coluna reminder_anchor ainda não existe no banco
+// (migração não aplicada), removemos o campo dos writes para não quebrar o salvamento.
+let anchorColumnMissing = false
+function stripAnchor(dbObj) {
+  if (anchorColumnMissing && dbObj && 'reminder_anchor' in dbObj) {
+    const copy = { ...dbObj }
+    delete copy.reminder_anchor
+    return copy
+  }
+  return dbObj
+}
+function isMissingAnchorError(error) {
+  if (!error) return false
+  if (error.code === '42703' || error.code === 'PGRST204') return true
+  return String(error.message || '').toLowerCase().includes('reminder_anchor')
+}
 
 // ── Theme ─────────────────────────────────────────────────────────────────────────
 function applyTheme(dark) {
@@ -47,11 +64,13 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, timer])
 }
 
-// Calcula o timestamp UTC em que o push deve ser enviado pelo servidor
-function calcRemindSendAt(dueDate, dueTime, reminderOffset) {
-  if (!dueDate || reminderOffset == null) return null
-  const dueMs = new Date(`${dueDate}T${dueTime || '09:00'}`).getTime()
-  const remMs = dueMs - reminderOffset * 60 * 1000
+// Calcula o timestamp UTC em que o push deve ser enviado pelo servidor.
+// Usa o horário de referência (início/término) conforme reminderAnchor da tarefa.
+function calcRemindSendAt(task) {
+  if (!task.dueDate || task.reminderOffset == null) return null
+  const dueMs = new Date(`${task.dueDate}T${reminderAnchorTime(task)}`).getTime()
+  if (isNaN(dueMs)) return null
+  const remMs = dueMs - task.reminderOffset * 60 * 1000
   return remMs > Date.now() ? new Date(remMs).toISOString() : null
 }
 
@@ -314,6 +333,7 @@ const useStore = create(
           priority: data.priority || 'medium', project: data.project || 'Geral',
           dueDate: data.dueDate || null, startTime: data.startTime || null, dueTime: data.dueTime || null,
           reminderOffset: data.reminderOffset ?? null,
+          reminderAnchor: data.reminderAnchor || 'start',
           completed: false, completedAt: null,
           createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,
           subtasks: [],
@@ -321,24 +341,55 @@ const useStore = create(
         set((s) => ({ tasks: [tempTask, ...s.tasks] }))
 
         try {
-          const reminder_send_at = calcRemindSendAt(data.dueDate || null, data.dueTime || null, data.reminderOffset ?? null)
-          const { data: saved, error } = await withTimeout(
-            supabase
-              .from('tasks')
-              .insert({ ...jsTaskToDb(data), title: data.title.trim(), user_id: uid, reminder_send_at, reminder_sent_at: null })
-              .select('*, subtasks(*)')
-              .single(),
+          const reminder_send_at = calcRemindSendAt({
+            dueDate: data.dueDate || null, startTime: data.startTime || null,
+            dueTime: data.dueTime || null, reminderOffset: data.reminderOffset ?? null,
+            reminderAnchor: data.reminderAnchor || 'start',
+          })
+          const payload = { ...jsTaskToDb(data), title: data.title.trim(), user_id: uid, reminder_send_at, reminder_sent_at: null }
+          const insertTask = () => withTimeout(
+            supabase.from('tasks').insert(stripAnchor(payload)).select('*, subtasks(*)').single(),
             10000
           )
+          let { data: saved, error } = await insertTask()
+          // Coluna reminder_anchor inexistente no banco — degrada e tenta de novo sem ela
+          if (error && isMissingAnchorError(error)) {
+            anchorColumnMissing = true
+            ;({ data: saved, error } = await insertTask())
+          }
 
           if (!error && saved) {
             const real = dbTaskToJs(saved)
-            set((s) => ({
-              tasks: s.tasks.map(t => t.id === tempId ? real : t),
-              focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
-            }))
-            try { scheduleTaskNotification(real) } catch {}
-            return real
+
+            // Se o usuário concluiu a tarefa enquanto o insert estava em voo, o estado
+            // local tem completed:true, mas a linha recém-criada veio como false. Sem
+            // isto, o `real` (false) sobrescreveria a conclusão e a tarefa "voltaria"
+            // para pendente. Além disso, o completeTask anterior tentou salvar usando o
+            // id temporário — que não bate em nenhuma linha — então re-persistimos com o id real.
+            const localNow     = get().tasks.find(t => t.id === tempId)
+            const keepCompleted = !!(localNow?.completed && !real.completed)
+            const merged = keepCompleted
+              ? { ...real, completed: true, completedAt: localNow.completedAt }
+              : real
+
+            if (keepCompleted) {
+              supabase.from('tasks')
+                .update({ completed: true, completed_at: localNow.completedAt })
+                .eq('id', real.id)
+                .catch(() => {})
+            }
+
+            set((s) => {
+              // Substitui o temp pelo real e remove eventual duplicata vinda do Realtime
+              // (o evento INSERT pode ter adicionado a linha com o id real antes deste swap)
+              const deduped = s.tasks.filter(t => t.id === tempId || t.id !== real.id)
+              return {
+                tasks: deduped.map(t => t.id === tempId ? merged : t),
+                focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
+              }
+            })
+            if (!merged.completed) { try { scheduleTaskNotification(merged) } catch {} }
+            return merged
           }
         } catch {}
         return tempTask
@@ -356,14 +407,18 @@ const useStore = create(
         try {
           const dbPatch = jsTaskToDb(patch)
           // Recalcula reminder_send_at quando campos de lembrete mudam
-          if ('dueDate' in patch || 'dueTime' in patch || 'reminderOffset' in patch) {
+          if ('dueDate' in patch || 'dueTime' in patch || 'startTime' in patch || 'reminderOffset' in patch || 'reminderAnchor' in patch) {
             const orig   = get().tasks.find(t => t.id === id)
             const merged = { ...orig, ...patch }
-            dbPatch.reminder_send_at = calcRemindSendAt(merged.dueDate, merged.dueTime, merged.reminderOffset)
+            dbPatch.reminder_send_at = calcRemindSendAt(merged)
             dbPatch.reminder_sent_at = null
           }
           if (Object.keys(dbPatch).length > 0) {
-            await supabase.from('tasks').update(dbPatch).eq('id', id)
+            let { error } = await supabase.from('tasks').update(stripAnchor(dbPatch)).eq('id', id)
+            if (error && isMissingAnchorError(error)) {
+              anchorColumnMissing = true
+              await supabase.from('tasks').update(stripAnchor(dbPatch)).eq('id', id)
+            }
           }
 
           if (patch.subtasks !== undefined) {
@@ -458,16 +513,24 @@ const useStore = create(
             supabase.from('user_stats').upsert({ id: uid, xp: newXp, level: newLevel, streak: newStreak, last_active_date: today }),
           ])
 
-          // Tarefa não salvou — reverte tudo no UI
+          // Tarefa não salvou — tenta uma vez mais antes de reverter (erro de rede transitório)
           if (taskResult.error) {
             if (import.meta.env.DEV) console.error('[Forje] completeTask task save failed:', taskResult.error)
-            set((s) => ({
-              tasks: s.tasks.map(t => t.id === id ? { ...t, completed: false, completedAt: null } : t),
-              user:  { ...s.user, xp: user.xp, level: oldLevel, streak: user.streak, lastActiveDate: user.lastActiveDate },
-              xpToast: null,
-              levelUpModal: null,
-            }))
-            return
+            const retry = await supabase.from('tasks')
+              .update({ completed: true, completed_at: now }).eq('id', id)
+              .then(r => r, e => ({ error: e }))
+
+            // Offline: mantém a conclusão (persistida localmente; loadAll preserva e ressincroniza).
+            // Online com erro persistente: reverte tudo no UI para não enganar o usuário.
+            if (retry.error && navigator.onLine) {
+              set((s) => ({
+                tasks: s.tasks.map(t => t.id === id ? { ...t, completed: false, completedAt: null } : t),
+                user:  { ...s.user, xp: user.xp, level: oldLevel, streak: user.streak, lastActiveDate: user.lastActiveDate },
+                xpToast: null,
+                levelUpModal: null,
+              }))
+              return
+            }
           }
 
           // Tarefa salvou mas XP falhou — tenta uma vez mais
@@ -572,7 +635,17 @@ const useStore = create(
             .eq('user_id', authUser.id)
             .order('created_at', { ascending: false })
           if (error) return { ok: false }
-          const tasks = (data || []).map(dbTaskToJs)
+          // Preserva conclusões locais que ainda não confirmaram no banco
+          // (mesma proteção do loadAll — evita reverter "executada" → "não executada")
+          const localTasks = get().tasks
+          const tasks = (data || []).map(row => {
+            const parsed = dbTaskToJs(row)
+            const local  = localTasks.find(l => l.id === parsed.id)
+            if (local?.completed && !parsed.completed) {
+              return { ...parsed, completed: true, completedAt: local.completedAt }
+            }
+            return parsed
+          })
           set({ tasks })
           return { ok: true, count: tasks.length }
         } catch {

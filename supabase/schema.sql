@@ -15,6 +15,7 @@ create table if not exists public.tasks (
   start_time      text,                   -- horário de início da tarefa (HH:MM)
   due_time        text,                   -- horário de término / prazo (HH:MM)
   reminder_offset  integer default null,
+  reminder_anchor  text default 'start',  -- referência do lembrete: 'start' (início) ou 'end' (término)
   reminder_send_at timestamptz,           -- UTC absoluto do push (calculado pelo cliente)
   reminder_sent_at timestamptz,           -- preenchido após o servidor enviar o push
   completed        boolean default false,
@@ -26,6 +27,7 @@ create table if not exists public.tasks (
 
 -- ── Migração para bancos existentes (execute no SQL Editor se já criou a tabela) ──
 -- alter table public.tasks add column if not exists start_time text;
+-- alter table public.tasks add column if not exists reminder_anchor text default 'start';
 
 -- ── Tabela de subtarefas ─────────────────────────────────────
 create table if not exists public.subtasks (

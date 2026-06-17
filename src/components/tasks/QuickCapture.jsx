@@ -10,7 +10,7 @@ const PRIORITIES = [
   { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
 ]
 
-const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null }
+const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null, reminderAnchor: 'start' }
 
 export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
@@ -227,6 +227,26 @@ export default function QuickCapture() {
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
+                          {form.reminderOffset !== null && (form.startTime || form.dueTime) && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-label text-on-surface-variant/60">Em relação a:</span>
+                              <div className="flex gap-1">
+                                {[{ v: 'start', l: 'Início' }, { v: 'end', l: 'Término' }].map(o => (
+                                  <button
+                                    key={o.v}
+                                    type="button"
+                                    onClick={() => setForm(f => ({ ...f, reminderAnchor: o.v }))}
+                                    className={`px-2.5 py-1 rounded-full text-[11px] font-label font-medium transition-all
+                                      ${form.reminderAnchor === o.v
+                                        ? 'bg-primary text-white'
+                                        : 'bg-surface-container text-on-surface-variant'}`}
+                                  >
+                                    {o.l}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="flex flex-col gap-1 col-span-2">

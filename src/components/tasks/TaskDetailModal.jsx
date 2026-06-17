@@ -47,7 +47,8 @@ export default function TaskDetailModal() {
         form.dueDate        !== editingTask.dueDate        ||
         form.startTime      !== editingTask.startTime      ||
         form.dueTime        !== editingTask.dueTime        ||
-        form.reminderOffset !== editingTask.reminderOffset
+        form.reminderOffset !== editingTask.reminderOffset ||
+        form.reminderAnchor !== editingTask.reminderAnchor
       )
       if (hasChanges) updateTask(form.id, form)
       completeTask(id)
@@ -340,6 +341,26 @@ export default function TaskDetailModal() {
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+                {form.reminderOffset !== null && (form.startTime || form.dueTime) && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-on-surface-variant">Em relação a:</span>
+                    <div className="flex gap-1.5">
+                      {[{ v: 'start', l: 'Início' }, { v: 'end', l: 'Término' }].map(o => (
+                        <button
+                          key={o.v}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, reminderAnchor: o.v }))}
+                          className={`px-3 py-1 rounded-full text-xs font-label font-medium transition-all
+                            ${(form.reminderAnchor || 'start') === o.v
+                              ? 'bg-primary text-white'
+                              : 'bg-surface-container text-on-surface-variant'}`}
+                        >
+                          {o.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
