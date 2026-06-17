@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { REMINDER_OPTIONS } from '../../utils/notifications'
+import { RECURRENCE_OPTIONS } from '../../utils/dates'
+import { addTaskToCalendar } from '../../utils/calendar'
 
 const PRIORITIES = ['critical','high','medium','low']
 const PRIORITY_LABELS = { critical: '🔴 Crítico', high: '🟠 Alto', medium: '🔵 Médio', low: '⚪ Baixo' }
@@ -48,7 +50,8 @@ export default function TaskDetailModal() {
         form.startTime      !== editingTask.startTime      ||
         form.dueTime        !== editingTask.dueTime        ||
         form.reminderOffset !== editingTask.reminderOffset ||
-        form.reminderAnchor !== editingTask.reminderAnchor
+        form.reminderAnchor !== editingTask.reminderAnchor ||
+        form.recurrence     !== editingTask.recurrence
       )
       if (hasChanges) updateTask(form.id, form)
       completeTask(id)
@@ -360,6 +363,40 @@ export default function TaskDetailModal() {
                       ))}
                     </div>
                   </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => addTaskToCalendar(form)}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-label font-medium
+                             text-on-surface-variant transition-colors hover:bg-secondary-container/40"
+                  style={{ border: '1px solid var(--clr-outline-var)' }}
+                >
+                  <span className="material-symbols-outlined text-[18px]">event</span>
+                  Adicionar ao calendário do celular
+                </button>
+              </div>
+            )}
+
+            {/* Recorrência */}
+            {form.dueDate && (
+              <div>
+                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">
+                  <span className="material-symbols-outlined text-[13px] align-middle mr-1">repeat</span>
+                  Repetir
+                </label>
+                <select
+                  className="input-field text-sm w-full"
+                  value={form.recurrence || 'none'}
+                  onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
+                >
+                  {RECURRENCE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {form.recurrence && form.recurrence !== 'none' && (
+                  <p className="text-[11px] text-on-surface-variant/60 mt-1.5">
+                    Ao concluir, uma nova tarefa é criada automaticamente para a próxima data.
+                  </p>
                 )}
               </div>
             )}

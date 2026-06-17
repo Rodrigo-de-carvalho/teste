@@ -47,6 +47,7 @@ export default function BottomNav() {
       {/* FAB center */}
       <button
         onClick={() => setQuickCaptureOpen(true)}
+        aria-label="Nova tarefa"
         className="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-primary-glow
                    transition-all duration-200 active:scale-95 -mt-8 mx-3 flex-shrink-0"
         style={{ boxShadow: '0 4px 24px rgba(107,56,212,0.5)' }}

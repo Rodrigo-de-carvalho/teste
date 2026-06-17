@@ -29,6 +29,7 @@ export function dbTaskToJs(row) {
     dueTime:        row.due_time   ? String(row.due_time).slice(0, 5)   : null,
     reminderOffset: row.reminder_offset ?? null,
     reminderAnchor: row.reminder_anchor ?? 'start',  // 'start' = lembrar antes do início | 'end' = antes do término
+    recurrence:     row.recurrence ?? 'none',        // 'none' | 'daily' | 'weekly' | 'monthly'
     completed:      row.completed    ?? false,
     completedAt: row.completed_at ?? null,
     weekDay:     row.week_day     ?? null,
@@ -52,6 +53,7 @@ export function jsTaskToDb(data) {
   if (data.dueTime        !== undefined) db.due_time        = data.dueTime
   if (data.reminderOffset !== undefined) db.reminder_offset = data.reminderOffset ?? null
   if (data.reminderAnchor !== undefined) db.reminder_anchor = data.reminderAnchor || 'start'
+  if (data.recurrence     !== undefined) db.recurrence     = data.recurrence || 'none'
   if (data.completed      !== undefined) db.completed      = data.completed
   if (data.completedAt !== undefined) db.completed_at = data.completedAt
   if (data.weekDay     !== undefined) db.week_day     = data.weekDay

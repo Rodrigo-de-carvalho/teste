@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from './lib/supabase'
 import useStore from './store/useStore'
 import Layout from './components/layout/Layout'
-import Dashboard from './pages/Dashboard'
-import Inbox from './pages/Inbox'
-import Planning from './pages/Planning'
-import Insights from './pages/Insights'
-import Settings from './pages/Settings'
-import LoginPage from './pages/LoginPage'
-import AuthCallback from './pages/AuthCallback'
+// Páginas carregadas sob demanda (code-splitting) — reduz o bundle inicial
+const Dashboard    = lazy(() => import('./pages/Dashboard'))
+const Inbox        = lazy(() => import('./pages/Inbox'))
+const Planning     = lazy(() => import('./pages/Planning'))
+const Insights     = lazy(() => import('./pages/Insights'))
+const Settings     = lazy(() => import('./pages/Settings'))
+const LoginPage    = lazy(() => import('./pages/LoginPage'))
+const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 import QuickCapture from './components/tasks/QuickCapture'
 import TaskDetailModal from './components/tasks/TaskDetailModal'
 import XpToast from './components/ui/XpToast'
@@ -22,6 +23,18 @@ import NotifHistoryPanel from './components/ui/NotifHistoryPanel'
 import { scheduleTaskNotification } from './utils/notifications'
 
 const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
+
+// Fallback enquanto o chunk da página carrega
+function PageFallback() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center animate-pulse">
+        <span className="material-symbols-outlined text-primary text-[22px]"
+          style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+      </div>
+    </div>
+  )
+}
 
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
@@ -165,12 +178,14 @@ export default function App() {
   }
 
   // ── Auth callback ────────────────────────────────────────────────────────────────
-  if (currentPage === 'auth_callback') return <AuthCallback />
+  if (currentPage === 'auth_callback') return (
+    <Suspense fallback={<PageFallback />}><AuthCallback /></Suspense>
+  )
 
   // ── Login ──────────────────────────────────────────────────────────────────────
   if (currentPage === 'login') return (
     <>
-      <LoginPage />
+      <Suspense fallback={<PageFallback />}><LoginPage /></Suspense>
       <LgpdBanner />
     </>
   )
@@ -196,7 +211,9 @@ export default function App() {
       <Layout>
         <AnimatePresence mode="wait">
           <motion.div key={currentPage} variants={pageVariants} initial="initial" animate="animate" exit="exit">
-            <Page />
+            <Suspense fallback={<PageFallback />}>
+              <Page />
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </Layout>

@@ -67,6 +67,8 @@ export default function TaskCard({ task, compact = false }) {
         {/* Checkbox */}
         <button
           onClick={handleCheck}
+          aria-label={task.completed ? 'Desmarcar tarefa' : 'Concluir tarefa'}
+          aria-pressed={task.completed}
           className={`forge-checkbox flex-shrink-0 ${task.completed || justCompleted ? 'checked' : ''}`}
           style={{ transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)' }}
         >

@@ -2,23 +2,32 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
 import { scheduleTaskNotification, cancelTaskNotification, subscribeAndSavePush, notificationsSupported, notificationPermission, reminderAnchorTime } from '../utils/notifications.js'
-import { localIso } from '../utils/dates.js'
+import { localIso, advanceDate } from '../utils/dates.js'
 
-// Degradação graciosa: se a coluna reminder_anchor ainda não existe no banco
+// Degradação graciosa: se uma coluna opcional ainda não existe no banco
 // (migração não aplicada), removemos o campo dos writes para não quebrar o salvamento.
-let anchorColumnMissing = false
-function stripAnchor(dbObj) {
-  if (anchorColumnMissing && dbObj && 'reminder_anchor' in dbObj) {
-    const copy = { ...dbObj }
-    delete copy.reminder_anchor
-    return copy
+const OPTIONAL_COLUMNS = ['reminder_anchor', 'recurrence']
+const missingColumns = new Set()
+function stripMissing(dbObj) {
+  if (!dbObj || missingColumns.size === 0) return dbObj
+  let copy = null
+  for (const col of missingColumns) {
+    if (col in dbObj) { copy = copy || { ...dbObj }; delete copy[col] }
   }
-  return dbObj
+  return copy || dbObj
 }
-function isMissingAnchorError(error) {
+// Detecta erro de coluna ausente, marca a coluna e retorna true se algo foi marcado
+function detectMissingColumn(error) {
   if (!error) return false
-  if (error.code === '42703' || error.code === 'PGRST204') return true
-  return String(error.message || '').toLowerCase().includes('reminder_anchor')
+  const msg = String(error.message || '').toLowerCase()
+  let found = false
+  for (const col of OPTIONAL_COLUMNS) {
+    if (msg.includes(col)) { missingColumns.add(col); found = true }
+  }
+  if (!found && (error.code === '42703' || error.code === 'PGRST204')) {
+    OPTIONAL_COLUMNS.forEach(c => missingColumns.add(c)); found = true
+  }
+  return found
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────────
@@ -160,13 +169,11 @@ const useStore = create(
           if (get().authUser?.id !== expectedUid) return
 
           if (statsRes.error) {
-            console.warn('[Forje] user_stats erro:', statsRes.error.code, statsRes.error.message)
+            if (import.meta.env.DEV) console.warn('[Forje] user_stats erro:', statsRes.error.code, statsRes.error.message)
             if (statsRes.error.code === 'PGRST116') {
               // Linha não existe — cria com defaults
               await supabase.from('user_stats').insert({ id: expectedUid }).catch(() => {})
             }
-          } else {
-            console.warn('[Forje] user_stats carregado: xp=' + statsRes.data?.xp + ' level=' + statsRes.data?.level)
           }
 
           const stats = statsRes.error ? null : dbStatsToJs(statsRes.data)
@@ -334,6 +341,7 @@ const useStore = create(
           dueDate: data.dueDate || null, startTime: data.startTime || null, dueTime: data.dueTime || null,
           reminderOffset: data.reminderOffset ?? null,
           reminderAnchor: data.reminderAnchor || 'start',
+          recurrence: data.recurrence || 'none',
           completed: false, completedAt: null,
           createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,
           subtasks: [],
@@ -348,13 +356,12 @@ const useStore = create(
           })
           const payload = { ...jsTaskToDb(data), title: data.title.trim(), user_id: uid, reminder_send_at, reminder_sent_at: null }
           const insertTask = () => withTimeout(
-            supabase.from('tasks').insert(stripAnchor(payload)).select('*, subtasks(*)').single(),
+            supabase.from('tasks').insert(stripMissing(payload)).select('*, subtasks(*)').single(),
             10000
           )
           let { data: saved, error } = await insertTask()
-          // Coluna reminder_anchor inexistente no banco — degrada e tenta de novo sem ela
-          if (error && isMissingAnchorError(error)) {
-            anchorColumnMissing = true
+          // Coluna opcional inexistente no banco — degrada e tenta de novo sem ela
+          if (error && detectMissingColumn(error)) {
             ;({ data: saved, error } = await insertTask())
           }
 
@@ -414,10 +421,9 @@ const useStore = create(
             dbPatch.reminder_sent_at = null
           }
           if (Object.keys(dbPatch).length > 0) {
-            let { error } = await supabase.from('tasks').update(stripAnchor(dbPatch)).eq('id', id)
-            if (error && isMissingAnchorError(error)) {
-              anchorColumnMissing = true
-              await supabase.from('tasks').update(stripAnchor(dbPatch)).eq('id', id)
+            let { error } = await supabase.from('tasks').update(stripMissing(dbPatch)).eq('id', id)
+            if (error && detectMissingColumn(error)) {
+              await supabase.from('tasks').update(stripMissing(dbPatch)).eq('id', id)
             }
           }
 
@@ -539,6 +545,20 @@ const useStore = create(
             supabase.from('user_stats')
               .upsert({ id: uid, xp: newXp, level: newLevel, streak: newStreak, last_active_date: today })
               .catch(() => {})
+          }
+
+          // Recorrência: ao concluir, gera a próxima ocorrência com a data avançada.
+          // Só online (evita criar cópias órfãs sem id real quando offline).
+          if (navigator.onLine && task.recurrence && task.recurrence !== 'none' && task.dueDate) {
+            const nextDate = advanceDate(task.dueDate, task.recurrence)
+            if (nextDate) {
+              get().addTask({
+                title: task.title, notes: task.notes, priority: task.priority, project: task.project,
+                dueDate: nextDate, startTime: task.startTime, dueTime: task.dueTime,
+                reminderOffset: task.reminderOffset, reminderAnchor: task.reminderAnchor,
+                recurrence: task.recurrence,
+              })
+            }
           }
         }
       },

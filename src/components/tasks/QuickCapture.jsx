@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { REMINDER_OPTIONS } from '../../utils/notifications'
+import { RECURRENCE_OPTIONS } from '../../utils/dates'
 
 const PRIORITIES = [
   { value: 'critical', label: '🔴 Crítico', color: 'bg-error-container text-on-error-container' },
@@ -10,7 +11,7 @@ const PRIORITIES = [
   { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
 ]
 
-const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null, reminderAnchor: 'start' }
+const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null, reminderAnchor: 'start', recurrence: 'none' }
 
 export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
@@ -247,6 +248,23 @@ export default function QuickCapture() {
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+                      {form.dueDate && (
+                        <div className="flex flex-col gap-1 col-span-2">
+                          <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">
+                            <span className="material-symbols-outlined text-[12px] align-middle mr-0.5">repeat</span>
+                            Repetir
+                          </label>
+                          <select
+                            className="input-field text-sm"
+                            value={form.recurrence || 'none'}
+                            onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
+                          >
+                            {RECURRENCE_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
                         </div>
                       )}
                       <div className="flex flex-col gap-1 col-span-2">
