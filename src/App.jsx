@@ -14,6 +14,7 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 import QuickCapture from './components/tasks/QuickCapture'
 import TaskDetailModal from './components/tasks/TaskDetailModal'
 import XpToast from './components/ui/XpToast'
+import ErrorToast from './components/ui/ErrorToast'
 import LevelUpModal from './components/ui/LevelUpModal'
 import InstallButton from './components/ui/InstallButton'
 import LgpdBanner from './components/ui/LgpdBanner'
@@ -48,10 +49,16 @@ export default function App() {
   const [offline, setOffline] = useState(!navigator.onLine)
 
   useEffect(() => {
-    const on  = () => setOffline(false)
+    const on  = () => {
+      setOffline(false)
+      // Reenvia tarefas criadas offline assim que a conexão volta.
+      useStore.getState().syncPendingTasks()
+    }
     const off = () => setOffline(true)
     window.addEventListener('online',  on)
     window.addEventListener('offline', off)
+    // Cobre o caso de o app abrir já online com tarefas pendentes de uma sessão anterior.
+    if (navigator.onLine) useStore.getState().syncPendingTasks()
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
   }, [])
 
@@ -126,6 +133,12 @@ export default function App() {
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [authUser?.id])
+
+  // ── Sincroniza tarefas criadas offline assim que o usuário fica disponível ────
+  useEffect(() => {
+    if (!authUser?.id) return
+    if (navigator.onLine) useStore.getState().syncPendingTasks()
   }, [authUser?.id])
 
   // ── Realtime: sincroniza com outros dispositivos ─────────────────────────────
@@ -220,6 +233,7 @@ export default function App() {
       <QuickCapture />
       <TaskDetailModal />
       <XpToast />
+      <ErrorToast />
       <LevelUpModal />
       <InstallButton />
       <LgpdBanner />

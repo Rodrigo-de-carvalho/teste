@@ -73,6 +73,36 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, timer])
 }
 
+// Timeout do insert de tarefa. Mais generoso que os 10s antigos: conexões lentas
+// merecem mais chance de concluir antes de considerarmos o salvamento perdido.
+const TASK_INSERT_TIMEOUT_MS = 18000
+
+// Insere uma linha de tarefa com rede de segurança:
+//  1ª tentativa → se coluna opcional ausente, degrada e tenta de novo →
+//  se ainda houver erro (timeout/rede transitória), mais uma tentativa antes de desistir.
+async function insertTaskRow(payload) {
+  const run = () => withTimeout(
+    supabase.from('tasks').insert(stripMissing(payload)).select('*, subtasks(*)').single(),
+    TASK_INSERT_TIMEOUT_MS
+  )
+  let { data: saved, error } = await run()
+  if (error && detectMissingColumn(error)) {
+    ;({ data: saved, error } = await run())   // degrada coluna ausente
+  }
+  if (error) {
+    ;({ data: saved, error } = await run())   // retry de erro transitório
+  }
+  return { saved, error }
+}
+
+// Está offline? (em ambientes sem navigator, assume online)
+function isOffline() {
+  return typeof navigator !== 'undefined' && navigator.onLine === false
+}
+
+const ERR_SAVE_TASK = 'Não foi possível salvar a tarefa. Tente novamente.'
+const MSG_LOCAL_SAVE = 'Tarefa salva localmente. Será sincronizada quando a internet voltar.'
+
 // Calcula o timestamp UTC em que o push deve ser enviado pelo servidor.
 // Usa o horário de referência (início/término) conforme reminderAnchor da tarefa.
 function calcRemindSendAt(task) {
@@ -112,6 +142,7 @@ const useStore = create(
       quickCaptureOpen:     false,
       quickCaptureDefaults: null,
       xpToast:              null,
+      errorToast:           null,  // { message, kind: 'error'|'info', key }
       levelUpModal:     null,
       editingTask:      null,
       notifHistoryOpen: false,
@@ -197,10 +228,14 @@ const useStore = create(
           const savedFocusId = stats?.focusTaskId
           const validFocusId = tasks.find(t => t.id === savedFocusId && !t.completed)?.id || null
 
+          // Preserva tarefas criadas offline ainda não sincronizadas (mesma proteção do reloadTasks)
+          const pending  = localTasks.filter(l => l._pendingSync && String(l.id).startsWith('temp_'))
+          const allTasks = [...pending, ...tasks]
+
           set((s) => ({
             user: { ...s.user, ...(stats ?? {}) },
-            tasks,
-            focusTaskId: validFocusId || (tasks.find(t => !t.completed)?.id || null),
+            tasks: allTasks,
+            focusTaskId: validFocusId || (allTasks.find(t => !t.completed)?.id || null),
           }))
 
           // Se Supabase retornou xp=0 mas localStorage tinha xp>0, restaura e sincroniza
@@ -348,6 +383,26 @@ const useStore = create(
         }
         set((s) => ({ tasks: [tempTask, ...s.tasks] }))
 
+        // Marca a tarefa otimista como pendente de sincronização e avisa o usuário.
+        // Mantém o dado local (zustand persist) para reenviar quando a conexão voltar.
+        const keepForSync = () => {
+          set((s) => ({ tasks: s.tasks.map(t => t.id === tempId ? { ...t, _pendingSync: true } : t) }))
+          get().showError(MSG_LOCAL_SAVE, 'info')
+          return get().tasks.find(t => t.id === tempId) || tempTask
+        }
+        // Remove a tarefa otimista e avisa que o salvamento falhou — nunca falha em silêncio.
+        const rollback = () => {
+          set((s) => ({
+            tasks: s.tasks.filter(t => t.id !== tempId),
+            focusTaskId: s.focusTaskId === tempId ? null : s.focusTaskId,
+          }))
+          get().showError(ERR_SAVE_TASK)
+          return null
+        }
+
+        // Sem internet: não tenta a rede, preserva localmente para sincronizar depois.
+        if (isOffline()) return keepForSync()
+
         try {
           const reminder_send_at = calcRemindSendAt({
             dueDate: data.dueDate || null, startTime: data.startTime || null,
@@ -355,15 +410,7 @@ const useStore = create(
             reminderAnchor: data.reminderAnchor || 'start',
           })
           const payload = { ...jsTaskToDb(data), title: data.title.trim(), user_id: uid, reminder_send_at, reminder_sent_at: null }
-          const insertTask = () => withTimeout(
-            supabase.from('tasks').insert(stripMissing(payload)).select('*, subtasks(*)').single(),
-            10000
-          )
-          let { data: saved, error } = await insertTask()
-          // Coluna opcional inexistente no banco — degrada e tenta de novo sem ela
-          if (error && detectMissingColumn(error)) {
-            ;({ data: saved, error } = await insertTask())
-          }
+          const { saved, error } = await insertTaskRow(payload)
 
           if (!error && saved) {
             const real = dbTaskToJs(saved)
@@ -398,8 +445,14 @@ const useStore = create(
             if (!merged.completed) { try { scheduleTaskNotification(merged) } catch {} }
             return merged
           }
-        } catch {}
-        return tempTask
+
+          // Insert falhou mesmo após os retries. Se a conexão caiu no meio,
+          // preserva local para sincronizar; caso contrário, desfaz e avisa.
+          return isOffline() ? keepForSync() : rollback()
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] addTask failed:', err)
+          return isOffline() ? keepForSync() : rollback()
+        }
       },
 
       updateTask: async (id, patch) => {
@@ -423,7 +476,23 @@ const useStore = create(
           if (Object.keys(dbPatch).length > 0) {
             let { error } = await supabase.from('tasks').update(stripMissing(dbPatch)).eq('id', id)
             if (error && detectMissingColumn(error)) {
-              await supabase.from('tasks').update(stripMissing(dbPatch)).eq('id', id)
+              ;({ error } = await supabase.from('tasks').update(stripMissing(dbPatch)).eq('id', id))  // degrada coluna ausente
+            }
+            if (error) {
+              ;({ error } = await supabase.from('tasks').update(stripMissing(dbPatch)).eq('id', id))  // retry transitório
+            }
+            // Falha persistente online: o update não foi salvo. Reverte para o original
+            // e avisa — não seguir como se tivesse dado certo. (Offline mantém otimista.)
+            if (error && navigator.onLine) {
+              if (import.meta.env.DEV) console.error('[Forje] updateTask save failed:', error)
+              if (original) {
+                set((s) => ({
+                  tasks: s.tasks.map(t => t.id === id ? original : t),
+                  editingTask: s.editingTask?.id === id ? original : s.editingTask,
+                }))
+              }
+              get().showError(ERR_SAVE_TASK)
+              return
             }
           }
 
@@ -458,11 +527,13 @@ const useStore = create(
           if (updatedTask) try { scheduleTaskNotification(updatedTask) } catch {}
         } catch (err) {
           if (import.meta.env.DEV) console.error('[Forje] updateTask failed:', err)
-          if (original) {
+          // Offline: mantém a edição otimista (persistida localmente). Online: reverte e avisa.
+          if (original && navigator.onLine) {
             set((s) => ({
               tasks: s.tasks.map(t => t.id === id ? original : t),
               editingTask: s.editingTask?.id === id ? original : s.editingTask,
             }))
+            get().showError(ERR_SAVE_TASK)
           }
         }
       },
@@ -475,13 +546,24 @@ const useStore = create(
           focusTaskId: s.focusTaskId === id ? null : s.focusTaskId,
           editingTask: s.editingTask?.id === id ? null : s.editingTask,
         }))
+        // Tarefa que nunca chegou ao servidor (offline/pendingSync): some só do estado local.
+        if (String(id).startsWith('temp_')) return
+
+        const restore = () => {
+          if (backup) set((s) => ({ tasks: [backup, ...s.tasks] }))
+          get().showError('Não foi possível remover a tarefa. Tente novamente.')
+        }
         try {
-          await supabase.from('tasks').delete().eq('id', id)
+          const { error } = await supabase.from('tasks').delete().eq('id', id)
+          // Erro retornado sem throw (RLS/rede) — antes era ignorado e a tarefa "ressuscitava"
+          // no próximo reload. Online: restaura no UI e avisa. Offline: confia no reenvio/reload.
+          if (error && navigator.onLine) {
+            if (import.meta.env.DEV) console.error('[Forje] deleteTask error:', error)
+            restore()
+          }
         } catch (err) {
           if (import.meta.env.DEV) console.error('[Forje] deleteTask failed:', err)
-          if (backup) {
-            set((s) => ({ tasks: [backup, ...s.tasks] }))
-          }
+          if (navigator.onLine) restore()
         }
       },
 
@@ -592,17 +674,33 @@ const useStore = create(
         if (!sub) return
 
         const done = !sub.done
-        set((s) => ({
+        const applyDone = (value) => set((s) => ({
           tasks: s.tasks.map(t =>
             t.id === taskId
-              ? { ...t, subtasks: t.subtasks.map(st => st.id === subId ? { ...st, done } : st) }
+              ? { ...t, subtasks: t.subtasks.map(st => st.id === subId ? { ...st, done: value } : st) }
               : t
           ),
           editingTask: s.editingTask?.id === taskId
-            ? { ...s.editingTask, subtasks: s.editingTask.subtasks.map(st => st.id === subId ? { ...st, done } : st) }
+            ? { ...s.editingTask, subtasks: s.editingTask.subtasks.map(st => st.id === subId ? { ...st, done: value } : st) }
             : s.editingTask,
         }))
-        await supabase.from('subtasks').update({ done }).eq('id', subId)
+        applyDone(done)
+
+        try {
+          const { error } = await supabase.from('subtasks').update({ done }).eq('id', subId)
+          // Erro retornado sem throw — antes era ignorado e o toggle não persistia.
+          if (error && navigator.onLine) {
+            if (import.meta.env.DEV) console.error('[Forje] toggleSubtask error:', error)
+            applyDone(sub.done)  // reverte ao valor anterior
+            get().showError('Não foi possível salvar a subtarefa. Tente novamente.')
+          }
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] toggleSubtask failed:', err)
+          if (navigator.onLine) {
+            applyDone(sub.done)
+            get().showError('Não foi possível salvar a subtarefa. Tente novamente.')
+          }
+        }
       },
 
       // ── Realtime ─────────────────────────────────────────────────────────────────────────
@@ -666,10 +764,46 @@ const useStore = create(
             }
             return parsed
           })
-          set({ tasks })
+          // Preserva tarefas criadas offline ainda não sincronizadas — senão o reload
+          // (que só traz o que está no banco) as apagaria antes do reenvio.
+          const pending = localTasks.filter(l => l._pendingSync && String(l.id).startsWith('temp_'))
+          set({ tasks: [...pending, ...tasks] })
           return { ok: true, count: tasks.length }
         } catch {
           return { ok: false }
+        }
+      },
+
+      // Reenvia ao Supabase as tarefas criadas offline (marcadas com _pendingSync e
+      // ainda com id temporário). Chamado pelo listener de 'online' em App.jsx.
+      syncPendingTasks: async () => {
+        const uid = get().authUser?.id
+        if (!uid || isOffline()) return
+        const pending = get().tasks.filter(t => t._pendingSync && String(t.id).startsWith('temp_'))
+        if (pending.length === 0) return
+
+        for (const t of pending) {
+          const reminder_send_at = calcRemindSendAt(t)
+          const payload = { ...jsTaskToDb(t), title: t.title, user_id: uid, reminder_send_at, reminder_sent_at: null }
+          let saved, error
+          try {
+            ;({ saved, error } = await insertTaskRow(payload))
+          } catch (err) {
+            if (import.meta.env.DEV) console.error('[Forje] syncPendingTasks failed:', err)
+            continue  // mantém _pendingSync para a próxima tentativa
+          }
+          if (!error && saved) {
+            const real = dbTaskToJs(saved)
+            set((s) => {
+              const deduped = s.tasks.filter(x => x.id === t.id || x.id !== real.id)
+              return {
+                tasks: deduped.map(x => x.id === t.id ? real : x),
+                focusTaskId: s.focusTaskId === t.id ? real.id : s.focusTaskId,
+              }
+            })
+            if (!real.completed) { try { scheduleTaskNotification(real) } catch {} }
+          }
+          // erro persistente: mantém _pendingSync (tenta de novo no próximo 'online')
         }
       },
 
@@ -695,6 +829,10 @@ const useStore = create(
 
       clearXpToast:      () => set({ xpToast: null }),
       clearLevelUpModal: () => set({ levelUpModal: null }),
+
+      // Toast genérico de feedback (erro de salvamento, aviso de sync local, etc.)
+      showError:       (message, kind = 'error') => set({ errorToast: { message, kind, key: Date.now() } }),
+      clearErrorToast: () => set({ errorToast: null }),
 
       getActiveTasks:    () => get().tasks.filter(t => !t.completed),
       getCompletedToday: () => {
