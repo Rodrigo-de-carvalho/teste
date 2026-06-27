@@ -8,12 +8,26 @@ export function localIso(date = new Date()) {
 }
 
 // Avança uma data "YYYY-MM-DD" conforme a recorrência. Retorna nova string ou null.
-export function advanceDate(iso, recurrence) {
+// recurrenceDays: array de números 0-6 (Dom=0..Sáb=6), usado quando recurrence === 'custom'.
+export function advanceDate(iso, recurrence, recurrenceDays) {
   if (!iso || !recurrence || recurrence === 'none') return null
   const d = new Date(iso + 'T00:00:00')
   if (recurrence === 'daily')   d.setDate(d.getDate() + 1)
   else if (recurrence === 'weekly')  d.setDate(d.getDate() + 7)
   else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
+  else if (recurrence === 'custom') {
+    const days = Array.isArray(recurrenceDays) ? recurrenceDays : []
+    // Sem dias configurados: comporta-se como 'daily' para não quebrar nada.
+    if (days.length === 0) {
+      d.setDate(d.getDate() + 1)
+    } else {
+      // Avança dia a dia (máx. 7) até cair num dia da semana selecionado.
+      for (let i = 0; i < 7; i++) {
+        d.setDate(d.getDate() + 1)
+        if (days.includes(d.getDay())) break
+      }
+    }
+  }
   else return null
   return localIso(d)
 }
@@ -23,6 +37,7 @@ export const RECURRENCE_OPTIONS = [
   { value: 'daily',   label: 'Diariamente'   },
   { value: 'weekly',  label: 'Semanalmente'  },
   { value: 'monthly', label: 'Mensalmente'   },
+  { value: 'custom',  label: 'Dias da semana' },
 ]
 
 export const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']

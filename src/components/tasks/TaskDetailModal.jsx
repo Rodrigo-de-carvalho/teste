@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { REMINDER_OPTIONS } from '../../utils/notifications'
-import { RECURRENCE_OPTIONS } from '../../utils/dates'
+import { RECURRENCE_OPTIONS, DAYS_PT } from '../../utils/dates'
 import { addTaskToCalendar } from '../../utils/calendar'
 
 const PRIORITIES = ['critical','high','medium','low']
@@ -24,8 +24,20 @@ export default function TaskDetailModal() {
     }
   }, [editingTask])
 
+  // Recorrência 'custom' precisa de pelo menos um dia da semana selecionado.
+  const recurrenceInvalid = !!form && form.recurrence === 'custom'
+    && (!Array.isArray(form.recurrenceDays) || form.recurrenceDays.length === 0)
+
+  function toggleDay(d) {
+    setForm(f => {
+      const cur = Array.isArray(f.recurrenceDays) ? f.recurrenceDays : []
+      const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort((a, b) => a - b)
+      return { ...f, recurrenceDays: next }
+    })
+  }
+
   function save() {
-    if (!form || !form.title.trim()) return
+    if (!form || !form.title.trim() || recurrenceInvalid) return
     updateTask(form.id, form)
     setEditingTask(null)
   }
@@ -51,7 +63,8 @@ export default function TaskDetailModal() {
         form.dueTime        !== editingTask.dueTime        ||
         form.reminderOffset !== editingTask.reminderOffset ||
         form.reminderAnchor !== editingTask.reminderAnchor ||
-        form.recurrence     !== editingTask.recurrence
+        form.recurrence     !== editingTask.recurrence     ||
+        JSON.stringify(form.recurrenceDays || []) !== JSON.stringify(editingTask.recurrenceDays || [])
       )
       if (hasChanges) updateTask(form.id, form)
       completeTask(id)
@@ -387,12 +400,47 @@ export default function TaskDetailModal() {
                 <select
                   className="input-field text-sm w-full"
                   value={form.recurrence || 'none'}
-                  onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
+                  onChange={e => {
+                    const v = e.target.value
+                    setForm(f => ({
+                      ...f,
+                      recurrence: v,
+                      // Ao escolher 'custom' pela 1ª vez, sugere segunda a sexta.
+                      recurrenceDays: v === 'custom'
+                        ? (Array.isArray(f.recurrenceDays) && f.recurrenceDays.length ? f.recurrenceDays : [1, 2, 3, 4, 5])
+                        : f.recurrenceDays,
+                    }))
+                  }}
                 >
                   {RECURRENCE_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+                {form.recurrence === 'custom' && (
+                  <div className="mt-2">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {DAYS_PT.map((d, i) => {
+                        const sel = (form.recurrenceDays || []).includes(i)
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleDay(i)}
+                            className={`px-2.5 py-1.5 rounded-full text-xs font-label font-medium transition-all
+                              ${sel
+                                ? 'bg-primary text-white ring-2 ring-primary/40 scale-105'
+                                : 'bg-surface-container text-on-surface-variant'}`}
+                          >
+                            {d}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {recurrenceInvalid && (
+                      <p className="text-[11px] text-error mt-1.5 font-label">Selecione ao menos um dia.</p>
+                    )}
+                  </div>
+                )}
                 {form.recurrence && form.recurrence !== 'none' && (
                   <p className="text-[11px] text-on-surface-variant/60 mt-1.5">
                     Ao concluir, uma nova tarefa é criada automaticamente para a próxima data.
@@ -450,7 +498,13 @@ export default function TaskDetailModal() {
           {/* Footer */}
           <div className="px-6 py-4 border-t border-outline-variant/30 flex gap-3">
             <button onClick={() => setEditingTask(null)} className="btn-ghost flex-1 justify-center">Cancelar</button>
-            <button onClick={save} className="btn-primary flex-1 justify-center">Salvar</button>
+            <button
+              onClick={save}
+              disabled={recurrenceInvalid}
+              className={`btn-primary flex-1 justify-center ${recurrenceInvalid ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
+            >
+              Salvar
+            </button>
           </div>
         </motion.div>
       )}

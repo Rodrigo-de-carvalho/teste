@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
 import { REMINDER_OPTIONS } from '../../utils/notifications'
-import { RECURRENCE_OPTIONS } from '../../utils/dates'
+import { RECURRENCE_OPTIONS, DAYS_PT } from '../../utils/dates'
 
 const PRIORITIES = [
   { value: 'critical', label: '🔴 Crítico', color: 'bg-error-container text-on-error-container' },
@@ -11,7 +11,7 @@ const PRIORITIES = [
   { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
 ]
 
-const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null, reminderAnchor: 'start', recurrence: 'none' }
+const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null, reminderAnchor: 'start', recurrence: 'none', recurrenceDays: null }
 
 export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
@@ -58,8 +58,20 @@ export default function QuickCapture() {
     }
   }, [quickCaptureOpen, quickCaptureDefaults])
 
+  // Recorrência 'custom' precisa de pelo menos um dia da semana selecionado.
+  const recurrenceInvalid = form.recurrence === 'custom'
+    && (!Array.isArray(form.recurrenceDays) || form.recurrenceDays.length === 0)
+
+  function toggleDay(d) {
+    setForm(f => {
+      const cur = Array.isArray(f.recurrenceDays) ? f.recurrenceDays : []
+      const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort((a, b) => a - b)
+      return { ...f, recurrenceDays: next }
+    })
+  }
+
   function submit() {
-    if (!form.title.trim()) return
+    if (!form.title.trim() || recurrenceInvalid) return
     // Dispara sem esperar a rede: a tarefa já entra na lista de forma otimista
     // (síncrono, no início de addTask) e fechamos o modal na hora. Se o salvamento
     // falhar de verdade, o próprio addTask exibe o toast de erro — não duplicamos aqui.
@@ -255,12 +267,47 @@ export default function QuickCapture() {
                           <select
                             className="input-field text-sm"
                             value={form.recurrence || 'none'}
-                            onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))}
+                            onChange={e => {
+                              const v = e.target.value
+                              setForm(f => ({
+                                ...f,
+                                recurrence: v,
+                                // Ao escolher 'custom' pela 1ª vez, sugere segunda a sexta.
+                                recurrenceDays: v === 'custom'
+                                  ? (Array.isArray(f.recurrenceDays) && f.recurrenceDays.length ? f.recurrenceDays : [1, 2, 3, 4, 5])
+                                  : f.recurrenceDays,
+                              }))
+                            }}
                           >
                             {RECURRENCE_OPTIONS.map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
+                          {form.recurrence === 'custom' && (
+                            <div className="mt-2">
+                              <div className="flex gap-1.5 flex-wrap">
+                                {DAYS_PT.map((d, i) => {
+                                  const sel = (form.recurrenceDays || []).includes(i)
+                                  return (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => toggleDay(i)}
+                                      className={`px-2.5 py-1.5 rounded-full text-xs font-label font-medium transition-all
+                                        ${sel
+                                          ? 'bg-primary text-white ring-2 ring-primary/40 scale-105'
+                                          : 'bg-surface-container text-on-surface-variant'}`}
+                                    >
+                                      {d}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {recurrenceInvalid && (
+                                <p className="text-[11px] text-error mt-1.5 font-label">Selecione ao menos um dia.</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="flex flex-col gap-1 col-span-2">
@@ -302,9 +349,9 @@ export default function QuickCapture() {
                   </button>
                   <button
                     onClick={submit}
-                    disabled={!form.title.trim()}
+                    disabled={!form.title.trim() || recurrenceInvalid}
                     className={`btn-primary py-2.5 px-6 text-sm
-                      ${!form.title.trim() ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
+                      ${!form.title.trim() || recurrenceInvalid ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
                   >
                     Adicionar
                     <kbd className="ml-1 text-white/60 text-[10px] hidden md:inline">↵</kbd>

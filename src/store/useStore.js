@@ -6,7 +6,7 @@ import { localIso, advanceDate } from '../utils/dates.js'
 
 // Degradação graciosa: se uma coluna opcional ainda não existe no banco
 // (migração não aplicada), removemos o campo dos writes para não quebrar o salvamento.
-const OPTIONAL_COLUMNS = ['reminder_anchor', 'recurrence']
+const OPTIONAL_COLUMNS = ['reminder_anchor', 'recurrence', 'recurrence_days']
 const missingColumns = new Set()
 function stripMissing(dbObj) {
   if (!dbObj || missingColumns.size === 0) return dbObj
@@ -22,7 +22,10 @@ function detectMissingColumn(error) {
   const msg = String(error.message || '').toLowerCase()
   let found = false
   for (const col of OPTIONAL_COLUMNS) {
-    if (msg.includes(col)) { missingColumns.add(col); found = true }
+    // Casamento por palavra inteira: evita que um erro sobre 'recurrence_days'
+    // marque também 'recurrence' (substring), o que faria o app parar de salvar
+    // a coluna 'recurrence' sem necessidade.
+    if (new RegExp(`\\b${col}\\b`).test(msg)) { missingColumns.add(col); found = true }
   }
   if (!found && (error.code === '42703' || error.code === 'PGRST204')) {
     OPTIONAL_COLUMNS.forEach(c => missingColumns.add(c)); found = true
@@ -377,9 +380,16 @@ const useStore = create(
           reminderOffset: data.reminderOffset ?? null,
           reminderAnchor: data.reminderAnchor || 'start',
           recurrence: data.recurrence || 'none',
+          recurrenceDays: data.recurrenceDays ?? null,
           completed: false, completedAt: null,
           createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,
           subtasks: [],
+          // Marca como pendente JÁ na criação (antes de qualquer rede): se o app for
+          // fechado logo após criar, o zustand persist já salvou com esta marca e a
+          // tarefa fica protegida pela preservação de _pendingSync em loadAll/reloadTasks.
+          // No sucesso do insert, o registro real (dbTaskToJs) substitui a temp e não
+          // tem este campo — então o _pendingSync some naturalmente, sem limpeza manual.
+          _pendingSync: true,
         }
         set((s) => ({ tasks: [tempTask, ...s.tasks] }))
 
@@ -632,13 +642,13 @@ const useStore = create(
           // Recorrência: ao concluir, gera a próxima ocorrência com a data avançada.
           // Só online (evita criar cópias órfãs sem id real quando offline).
           if (navigator.onLine && task.recurrence && task.recurrence !== 'none' && task.dueDate) {
-            const nextDate = advanceDate(task.dueDate, task.recurrence)
+            const nextDate = advanceDate(task.dueDate, task.recurrence, task.recurrenceDays)
             if (nextDate) {
               get().addTask({
                 title: task.title, notes: task.notes, priority: task.priority, project: task.project,
                 dueDate: nextDate, startTime: task.startTime, dueTime: task.dueTime,
                 reminderOffset: task.reminderOffset, reminderAnchor: task.reminderAnchor,
-                recurrence: task.recurrence,
+                recurrence: task.recurrence, recurrenceDays: task.recurrenceDays,
               })
             }
           }

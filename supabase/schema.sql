@@ -16,7 +16,8 @@ create table if not exists public.tasks (
   due_time        text,                   -- horário de término / prazo (HH:MM)
   reminder_offset  integer default null,
   reminder_anchor  text default 'start',  -- referência do lembrete: 'start' (início) ou 'end' (término)
-  recurrence       text default 'none',   -- 'none' | 'daily' | 'weekly' | 'monthly'
+  recurrence       text default 'none',   -- 'none' | 'daily' | 'weekly' | 'monthly' | 'custom'
+  recurrence_days  integer[],             -- dias da semana (0=Dom..6=Sáb) quando recurrence='custom'
   reminder_send_at timestamptz,           -- UTC absoluto do push (calculado pelo cliente)
   reminder_sent_at timestamptz,           -- preenchido após o servidor enviar o push
   completed        boolean default false,
@@ -30,6 +31,7 @@ create table if not exists public.tasks (
 -- alter table public.tasks add column if not exists start_time text;
 -- alter table public.tasks add column if not exists reminder_anchor text default 'start';
 -- alter table public.tasks add column if not exists recurrence text default 'none';
+-- alter table public.tasks add column if not exists recurrence_days integer[];
 
 -- ── Tabela de subtarefas ─────────────────────────────────────
 create table if not exists public.subtasks (
