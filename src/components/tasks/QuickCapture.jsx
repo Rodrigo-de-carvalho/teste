@@ -17,7 +17,6 @@ export default function QuickCapture() {
   const { quickCaptureOpen, setQuickCaptureOpen, quickCaptureDefaults, addTask } = useStore()
   const [form, setForm]         = useState(EMPTY)
   const [expanded, setExpanded] = useState(false)
-  const [loading, setLoading]   = useState(false)
   const [bottomOffset, setBottomOffset] = useState(0)
   const inputRef = useRef(null)
 
@@ -56,19 +55,16 @@ export default function QuickCapture() {
     } else {
       setForm(EMPTY)
       setExpanded(false)
-      setLoading(false)
     }
   }, [quickCaptureOpen, quickCaptureDefaults])
 
-  async function submit() {
-    if (!form.title.trim() || loading) return
-    setLoading(true)
-    try {
-      await addTask(form)
-    } finally {
-      setLoading(false)
-      setQuickCaptureOpen(false)
-    }
+  function submit() {
+    if (!form.title.trim()) return
+    // Dispara sem esperar a rede: a tarefa já entra na lista de forma otimista
+    // (síncrono, no início de addTask) e fechamos o modal na hora. Se o salvamento
+    // falhar de verdade, o próprio addTask exibe o toast de erro — não duplicamos aqui.
+    addTask(form).catch(() => {})
+    setQuickCaptureOpen(false)
   }
 
   function handleKey(e) {
@@ -306,11 +302,11 @@ export default function QuickCapture() {
                   </button>
                   <button
                     onClick={submit}
-                    disabled={!form.title.trim() || loading}
+                    disabled={!form.title.trim()}
                     className={`btn-primary py-2.5 px-6 text-sm
-                      ${!form.title.trim() || loading ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
+                      ${!form.title.trim() ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
                   >
-                    {loading ? 'Salvando...' : 'Adicionar'}
+                    Adicionar
                     <kbd className="ml-1 text-white/60 text-[10px] hidden md:inline">↵</kbd>
                   </button>
                 </div>
