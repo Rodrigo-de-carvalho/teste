@@ -6,7 +6,7 @@ import { localIso, advanceDate } from '../utils/dates.js'
 
 // Degradação graciosa: se uma coluna opcional ainda não existe no banco
 // (migração não aplicada), removemos o campo dos writes para não quebrar o salvamento.
-const OPTIONAL_COLUMNS = ['reminder_anchor', 'recurrence', 'recurrence_days']
+const OPTIONAL_COLUMNS = ['reminder_anchor', 'recurrence', 'recurrence_days', 'client_id']
 const missingColumns = new Set()
 function stripMissing(dbObj) {
   if (!dbObj || missingColumns.size === 0) return dbObj
@@ -26,6 +26,11 @@ function detectMissingColumn(error) {
     // marque também 'recurrence' (substring), o que faria o app parar de salvar
     // a coluna 'recurrence' sem necessidade.
     if (new RegExp(`\\b${col}\\b`).test(msg)) { missingColumns.add(col); found = true }
+  }
+  // upsert(onConflict:'client_id') sem a constraint única correspondente (migração só
+  // adicionou a coluna, sem o índice único) → degrada client_id para usar insert simples.
+  if (error.code === '42P10' || msg.includes('on conflict')) {
+    missingColumns.add('client_id'); found = true
   }
   if (!found && (error.code === '42703' || error.code === 'PGRST204')) {
     OPTIONAL_COLUMNS.forEach(c => missingColumns.add(c)); found = true
@@ -68,29 +73,57 @@ const LOGGED_OUT_STATE = {
   user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0, lastActiveDate: null },
 }
 
-// Garante que uma promise resolva em no máximo `ms` milissegundos.
-function withTimeout(promise, ms) {
-  const timer = new Promise(resolve =>
-    setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), ms)
-  )
-  return Promise.race([promise, timer])
+// Gera um UUID v4 para idempotência (client_id). Usa Web Crypto; sem ele, retorna null
+// (sem proteção de idempotência, mas sem quebrar — caso extremo sem crypto disponível).
+function newClientId() {
+  try {
+    const c = globalThis.crypto
+    if (c?.randomUUID) return c.randomUUID()
+    if (c?.getRandomValues) {
+      const b = c.getRandomValues(new Uint8Array(16))
+      b[6] = (b[6] & 0x0f) | 0x40
+      b[8] = (b[8] & 0x3f) | 0x80
+      const h = [...b].map(x => x.toString(16).padStart(2, '0'))
+      return `${h[0]}${h[1]}${h[2]}${h[3]}-${h[4]}${h[5]}-${h[6]}${h[7]}-${h[8]}${h[9]}-${h.slice(10).join('')}`
+    }
+  } catch { /* sem crypto */ }
+  return null
 }
 
 // Timeout do insert de tarefa. Mais generoso que os 10s antigos: conexões lentas
 // merecem mais chance de concluir antes de considerarmos o salvamento perdido.
 const TASK_INSERT_TIMEOUT_MS = 18000
 
-// Insere uma linha de tarefa com rede de segurança:
-//  1ª tentativa → se coluna opcional ausente, degrada e tenta de novo →
-//  se ainda houver erro (timeout/rede transitória), mais uma tentativa antes de desistir.
+// Persiste uma linha de tarefa com rede de segurança:
+//  - Idempotência: quando a coluna client_id existe (e temos um), usa
+//    upsert(onConflict:'client_id'). Assim, mesmo que vários retries da MESMA tarefa
+//    cheguem ao servidor (por timeout), o resultado é UMA única linha — nunca duplica.
+//    Sem a coluna (migração não aplicada), degrada para insert simples.
+//  - Timeout REAL via AbortController: ao estourar o tempo, ABORTA a requisição original
+//    antes do retry, em vez de deixá-la correndo em segundo plano sem ninguém ouvindo.
+//  - 1ª tentativa → se coluna opcional ausente, degrada e tenta de novo → se ainda
+//    houver erro (timeout/rede transitória), mais uma tentativa antes de desistir.
 async function insertTaskRow(payload) {
-  const run = () => withTimeout(
-    supabase.from('tasks').insert(stripMissing(payload)).select('*, subtasks(*)').single(),
-    TASK_INSERT_TIMEOUT_MS
-  )
+  const run = async () => {
+    const usable = stripMissing(payload)
+    const idempotent = 'client_id' in usable   // coluna presente e temos client_id → upsert
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TASK_INSERT_TIMEOUT_MS)
+    try {
+      const base = idempotent
+        ? supabase.from('tasks').upsert(usable, { onConflict: 'client_id' })
+        : supabase.from('tasks').insert(usable)
+      return await base.select('*, subtasks(*)').single().abortSignal(controller.signal)
+    } catch (err) {
+      // Abort por timeout (ou rede que vira throw) → trata como erro transitório
+      return { data: null, error: err || { message: 'timeout' } }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
   let { data: saved, error } = await run()
   if (error && detectMissingColumn(error)) {
-    ;({ data: saved, error } = await run())   // degrada coluna ausente
+    ;({ data: saved, error } = await run())   // degrada coluna ausente (inclui client_id)
   }
   if (error) {
     ;({ data: saved, error } = await run())   // retry de erro transitório
@@ -373,6 +406,10 @@ const useStore = create(
         if (!uid) return
 
         const tempId = `temp_${Date.now()}`
+        // client_id de idempotência: gerado UMA vez e reusado em toda tentativa de insert
+        // desta tarefa (original, retries e syncPendingTasks após offline/reload). Persiste
+        // junto com a tempTask, então sobrevive a fechar/reabrir o app.
+        const clientId = newClientId()
         const tempTask = {
           id: tempId, title: data.title.trim(), notes: data.notes || '',
           priority: data.priority || 'medium', project: data.project || 'Geral',
@@ -384,6 +421,7 @@ const useStore = create(
           completed: false, completedAt: null,
           createdAt: new Date().toISOString(), weekDay: data.weekDay ?? null,
           subtasks: [],
+          clientId,
           // Marca como pendente JÁ na criação (antes de qualquer rede): se o app for
           // fechado logo após criar, o zustand persist já salvou com esta marca e a
           // tarefa fica protegida pela preservação de _pendingSync em loadAll/reloadTasks.
@@ -419,7 +457,12 @@ const useStore = create(
             dueTime: data.dueTime || null, reminderOffset: data.reminderOffset ?? null,
             reminderAnchor: data.reminderAnchor || 'start',
           })
-          const payload = { ...jsTaskToDb(data), title: data.title.trim(), user_id: uid, reminder_send_at, reminder_sent_at: null }
+          const payload = {
+            ...jsTaskToDb(data),
+            title: data.title.trim(), user_id: uid,
+            reminder_send_at, reminder_sent_at: null,
+            ...(clientId ? { client_id: clientId } : {}),
+          }
           const { saved, error } = await insertTaskRow(payload)
 
           if (!error && saved) {
