@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { REMINDER_OPTIONS } from '../../utils/notifications'
 import { RECURRENCE_OPTIONS, DAYS_PT, formatDate, recurrenceInvalid } from '../../utils/dates'
@@ -37,16 +38,34 @@ export function AutoTextarea({ value, onChange, minHeight = 80, className = '', 
 }
 
 // ── Bandeira de prioridade (ao lado do título) ──────────────────────────────
+const MENU_GAP = 4   // espaço entre botão e menu
+
 export function PriorityFlag({ value, onChange }) {
-  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState(null)   // null = fechado; senão { top|bottom, right }
+  const btnRef = useRef(null)
   const cur = PRIORITY_OPTS.find(p => p.value === value) || PRIORITY_OPTS[2]
   const isDefault = (value || 'medium') === 'medium'
 
+  function openMenu() {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (!r) return
+    const spaceBelow = window.innerHeight - r.bottom
+    // Sem espaço suficiente abaixo → abre para cima (ancorado pela base do botão).
+    const dropUp = spaceBelow < 200
+    setPos({
+      right: Math.max(8, window.innerWidth - r.right),  // alinhado à direita do botão
+      ...(dropUp
+        ? { bottom: window.innerHeight - r.top + MENU_GAP }
+        : { top: r.bottom + MENU_GAP }),
+    })
+  }
+
   return (
-    <div className="relative flex-shrink-0">
+    <div className="flex-shrink-0">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => (pos ? setPos(null) : openMenu())}
         title={`Prioridade: ${cur.label}`}
         aria-label={`Prioridade: ${cur.label}`}
         className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-container transition-colors"
@@ -58,18 +77,19 @@ export function PriorityFlag({ value, onChange }) {
           flag
         </span>
       </button>
-      {open && (
+      {pos && createPortal(
         <>
-          <div className="fixed inset-0 z-[95]" onClick={() => setOpen(false)} />
+          {/* overlay invisível: fecha ao clicar fora */}
+          <div className="fixed inset-0 z-[1000]" onClick={() => setPos(null)} />
           <div
-            className="absolute z-[96] right-0 mt-1 w-40 rounded-xl py-1 shadow-float border border-outline-variant/40"
-            style={{ background: 'var(--clr-white-card)' }}
+            className="fixed z-[1001] w-40 rounded-xl py-1 shadow-float border border-outline-variant/40"
+            style={{ background: 'var(--clr-white-card)', right: pos.right, top: pos.top, bottom: pos.bottom }}
           >
             {PRIORITY_OPTS.map(p => (
               <button
                 key={p.value}
                 type="button"
-                onClick={() => { onChange(p.value); setOpen(false) }}
+                onClick={() => { onChange(p.value); setPos(null) }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-surface-container transition-colors"
               >
                 <span className={`material-symbols-outlined text-[18px] ${p.cls}`} style={{ fontVariationSettings: "'FILL' 1" }}>flag</span>
@@ -78,7 +98,8 @@ export function PriorityFlag({ value, onChange }) {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )

@@ -137,7 +137,17 @@ function isOffline() {
 }
 
 const ERR_SAVE_TASK = 'Não foi possível salvar a tarefa. Tente novamente.'
+const ERR_SAVE_STATS = 'Não foi possível salvar seu progresso. Tente novamente.'
 const MSG_LOCAL_SAVE = 'Tarefa salva localmente. Será sincronizada quando a internet voltar.'
+
+// Salva stats no user_stats com 1 retry simples. Não precisa de idempotência por
+// client_id (é sempre upsert pela mesma id fixa do usuário). Retorna { error }.
+async function upsertStats(payload) {
+  const run = () => supabase.from('user_stats').upsert(payload).then(r => r, e => ({ error: e }))
+  let { error } = await run()
+  if (error) ({ error } = await run())   // retry transitório
+  return { error }
+}
 
 // Calcula o timestamp UTC em que o push deve ser enviado pelo servidor.
 // Usa o horário de referência (início/término) conforme reminderAnchor da tarefa.
@@ -344,6 +354,7 @@ const useStore = create(
 
       // ── Focus timer ───────────────────────────────────────────────────────────────────
       addFocusTime: async (seconds) => {
+        const prevUser = get().user
         set((s) => ({
           user: {
             ...s.user,
@@ -352,13 +363,18 @@ const useStore = create(
           },
         }))
         const uid = get().authUser?.id
-        if (uid) {
-          const { user } = get()
-          await supabase.from('user_stats').upsert({
-            id: uid,
-            total_focus_sec: user.totalFocusSec,
-            today_focus_sec: user.todayFocusSec,
-          })
+        if (!uid) return
+        const { user } = get()
+        const { error } = await upsertStats({
+          id: uid,
+          total_focus_sec: user.totalFocusSec,
+          today_focus_sec: user.todayFocusSec,
+        })
+        // Falhou mesmo após retry: reverte para não deixar o local adiantado do banco.
+        if (error) {
+          if (import.meta.env.DEV) console.error('[Forje] addFocusTime save failed:', error)
+          set({ user: prevUser })
+          get().showError(ERR_SAVE_STATS)
         }
       },
 
@@ -373,6 +389,7 @@ const useStore = create(
 
         const streakLabel = multiplier > 1 ? ` ×${multiplier.toFixed(2).replace(/\.?0+$/, '')}` : ''
 
+        const prevUser = get().user
         set((s) => ({
           user: {
             ...s.user,
@@ -386,23 +403,33 @@ const useStore = create(
         }))
 
         const uid = get().authUser?.id
-        if (uid) {
-          const { user: u } = get()
-          await supabase.from('user_stats').upsert({
-            id: uid,
-            xp: newXp,
-            level: newLevel,
-            total_focus_sec: u.totalFocusSec,
-            today_focus_sec: u.todayFocusSec,
-          })
+        if (!uid) return
+        const { user: u } = get()
+        const { error } = await upsertStats({
+          id: uid,
+          xp: newXp,
+          level: newLevel,
+          total_focus_sec: u.totalFocusSec,
+          today_focus_sec: u.todayFocusSec,
+        })
+        // Falhou mesmo após retry: reverte XP/nível/foco e desfaz o toast/modal otimistas.
+        if (error) {
+          if (import.meta.env.DEV) console.error('[Forje] completeFocusSession save failed:', error)
+          set({ user: prevUser, xpToast: null, levelUpModal: null })
+          get().showError(ERR_SAVE_STATS)
         }
       },
 
       resetXp: async () => {
+        const prevUser = get().user
         set((s) => ({ user: { ...s.user, xp: 0, level: 1 } }))
         const uid = get().authUser?.id
-        if (uid) {
-          await supabase.from('user_stats').upsert({ id: uid, xp: 0, level: 1 })
+        if (!uid) return
+        const { error } = await upsertStats({ id: uid, xp: 0, level: 1 })
+        if (error) {
+          if (import.meta.env.DEV) console.error('[Forje] resetXp save failed:', error)
+          set({ user: prevUser })
+          get().showError(ERR_SAVE_STATS)
         }
       },
 
