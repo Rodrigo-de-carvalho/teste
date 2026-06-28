@@ -64,6 +64,17 @@ export function jsTaskToDb(data) {
   return db
 }
 
+export function dbNoteToJs(row) {
+  if (!row) return null
+  return {
+    id:        row.id,
+    title:     row.title ?? '',
+    body:      row.body  ?? '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 export function dbStatsToJs(row) {
   if (!row) return null
   return {

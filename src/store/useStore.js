@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, getUserMeta } from '../lib/supabase.js'
+import { supabase, dbTaskToJs, jsTaskToDb, dbStatsToJs, dbNoteToJs, getUserMeta } from '../lib/supabase.js'
 import { scheduleTaskNotification, cancelTaskNotification, subscribeAndSavePush, notificationsSupported, notificationPermission, reminderAnchorTime } from '../utils/notifications.js'
 import { localIso, advanceDate } from '../utils/dates.js'
 
@@ -69,7 +69,7 @@ export function xpProgressInLevel(xp) {
 
 const LOGGED_OUT_STATE = {
   session: null, authUser: null, isLoggedIn: false,
-  tasks: [], focusTaskId: null, currentPage: 'login',
+  tasks: [], notes: [], focusTaskId: null, currentPage: 'login',
   user: { name: 'Visitante', email: null, avatar: null, xp: 0, level: 1, streak: 0, totalFocusSec: 0, todayFocusSec: 0, lastActiveDate: null },
 }
 
@@ -170,6 +170,9 @@ const useStore = create(
       // ─ Tasks ─
       tasks:      [],
       focusTaskId: null,
+
+      // ─ Notas (bloco de notas livre) ─
+      notes:      [],
 
       // ─ UI ─
       darkMode:         false,
@@ -273,6 +276,9 @@ const useStore = create(
             tasks: allTasks,
             focusTaskId: validFocusId || (allTasks.find(t => !t.completed)?.id || null),
           }))
+
+          // Carrega o bloco de notas (não bloqueia o restante; tolera tabela ausente)
+          get().loadNotes()
 
           // Se Supabase retornou xp=0 mas localStorage tinha xp>0, restaura e sincroniza
           if (stats && stats.xp === 0 && localXp > 0) {
@@ -868,6 +874,91 @@ const useStore = create(
         set(s => ({ user: { ...s.user, xp, level } }))
         try { await supabase.from('user_stats').upsert({ id: authUser.id, xp, level }) } catch {}
         return { xp, level }
+      },
+
+      // ── Notas (bloco de notas livre) ───────────────────────────────────────────────
+      // Mesmo padrão otimista + rollback + toast das tarefas, sem a proteção de timeout/
+      // idempotência (perder uma nota é menos crítico) — mas nunca falha em silêncio.
+      loadNotes: async () => {
+        const uid = get().authUser?.id
+        if (!uid) return
+        try {
+          const { data, error } = await supabase
+            .from('notes').select('*').eq('user_id', uid)
+            .order('updated_at', { ascending: false })
+          if (error) return  // tabela pode não existir ainda (migração não aplicada)
+          if (get().authUser?.id !== uid) return  // usuário mudou enquanto carregava
+          set({ notes: (data || []).map(dbNoteToJs) })
+        } catch { /* offline / tabela ausente — ignora */ }
+      },
+
+      addNote: async (data = {}) => {
+        const uid = get().authUser?.id
+        if (!uid) return null
+        const tempId = `temp_${Date.now()}`
+        const now = new Date().toISOString()
+        const tempNote = { id: tempId, title: data.title || '', body: data.body || '', createdAt: now, updatedAt: now }
+        set((s) => ({ notes: [tempNote, ...s.notes] }))
+        try {
+          const { data: saved, error } = await supabase
+            .from('notes').insert({ user_id: uid, title: tempNote.title, body: tempNote.body })
+            .select('*').single()
+          if (error || !saved) {
+            set((s) => ({ notes: s.notes.filter(n => n.id !== tempId) }))
+            get().showError('Não foi possível criar a nota. Tente novamente.')
+            return null
+          }
+          const real = dbNoteToJs(saved)
+          set((s) => ({ notes: s.notes.map(n => n.id === tempId ? real : n) }))
+          return real
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] addNote failed:', err)
+          set((s) => ({ notes: s.notes.filter(n => n.id !== tempId) }))
+          get().showError('Não foi possível criar a nota. Tente novamente.')
+          return null
+        }
+      },
+
+      updateNote: async (id, patch) => {
+        const original = get().notes.find(n => n.id === id)
+        set((s) => ({ notes: s.notes.map(n => n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n) }))
+        if (String(id).startsWith('temp_')) return  // insert ainda em voo; nada a persistir
+        const db = {}
+        if (patch.title !== undefined) db.title = patch.title
+        if (patch.body  !== undefined) db.body  = patch.body
+        if (Object.keys(db).length === 0) return
+        try {
+          const { error } = await supabase.from('notes').update(db).eq('id', id)
+          if (error && navigator.onLine) {
+            if (import.meta.env.DEV) console.error('[Forje] updateNote error:', error)
+            if (original) set((s) => ({ notes: s.notes.map(n => n.id === id ? original : n) }))
+            get().showError('Não foi possível salvar a nota. Tente novamente.')
+          }
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] updateNote failed:', err)
+          if (original && navigator.onLine) {
+            set((s) => ({ notes: s.notes.map(n => n.id === id ? original : n) }))
+            get().showError('Não foi possível salvar a nota. Tente novamente.')
+          }
+        }
+      },
+
+      deleteNote: async (id) => {
+        const backup = get().notes.find(n => n.id === id)
+        set((s) => ({ notes: s.notes.filter(n => n.id !== id) }))
+        if (String(id).startsWith('temp_')) return
+        try {
+          const { error } = await supabase.from('notes').delete().eq('id', id)
+          if (error && navigator.onLine) {
+            if (import.meta.env.DEV) console.error('[Forje] deleteNote error:', error)
+            if (backup) set((s) => ({ notes: [backup, ...s.notes] }))
+            get().showError('Não foi possível excluir a nota. Tente novamente.')
+          }
+        } catch (err) {
+          if (import.meta.env.DEV) console.error('[Forje] deleteNote failed:', err)
+          if (backup) set((s) => ({ notes: [backup, ...s.notes] }))
+          get().showError('Não foi possível excluir a nota. Tente novamente.')
+        }
       },
 
       setNotifHistoryOpen: (v) => set({ notifHistoryOpen: v }),

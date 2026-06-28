@@ -1,15 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
-import { REMINDER_OPTIONS } from '../../utils/notifications'
-import { RECURRENCE_OPTIONS, DAYS_PT } from '../../utils/dates'
-
-const PRIORITIES = [
-  { value: 'critical', label: '🔴 Crítico', color: 'bg-error-container text-on-error-container' },
-  { value: 'high',     label: '🟠 Alto',    color: 'bg-tertiary/10 text-tertiary'               },
-  { value: 'medium',   label: '🔵 Médio',   color: 'bg-primary/10 text-primary'                 },
-  { value: 'low',      label: '⚪ Baixo',   color: 'bg-secondary-container text-secondary'       },
-]
+import { PriorityFlag, MetaChips } from './TaskFields'
+import { recurrenceInvalid } from '../../utils/dates'
 
 const EMPTY = { title: '', notes: '', priority: 'medium', project: '', dueDate: '', startTime: '', dueTime: '', reminderOffset: null, reminderAnchor: 'start', recurrence: 'none', recurrenceDays: null }
 
@@ -58,20 +51,10 @@ export default function QuickCapture() {
     }
   }, [quickCaptureOpen, quickCaptureDefaults])
 
-  // Recorrência 'custom' precisa de pelo menos um dia da semana selecionado.
-  const recurrenceInvalid = form.recurrence === 'custom'
-    && (!Array.isArray(form.recurrenceDays) || form.recurrenceDays.length === 0)
-
-  function toggleDay(d) {
-    setForm(f => {
-      const cur = Array.isArray(f.recurrenceDays) ? f.recurrenceDays : []
-      const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort((a, b) => a - b)
-      return { ...f, recurrenceDays: next }
-    })
-  }
+  const invalid = recurrenceInvalid(form)
 
   function submit() {
-    if (!form.title.trim() || recurrenceInvalid) return
+    if (!form.title.trim() || invalid) return
     // Dispara sem esperar a rede: a tarefa já entra na lista de forma otimista
     // (síncrono, no início de addTask) e fechamos o modal na hora. Se o salvamento
     // falhar de verdade, o próprio addTask exibe o toast de erro — não duplicamos aqui.
@@ -135,6 +118,7 @@ export default function QuickCapture() {
                   onKeyDown={handleKey}
                   maxLength={200}
                 />
+                <PriorityFlag value={form.priority} onChange={(p) => setForm(f => ({ ...f, priority: p }))} />
                 {form.title ? (
                   <button onClick={() => setForm(f => ({ ...f, title: '' }))}
                     className="w-8 h-8 flex items-center justify-center rounded-full
@@ -155,24 +139,7 @@ export default function QuickCapture() {
                 * Obrigatório · todo o resto é opcional
               </p>
 
-              {/* Priority chips */}
-              <div className="flex gap-2 px-5 pb-3 overflow-x-auto scrollbar-none flex-shrink-0">
-                {PRIORITIES.map(p => (
-                  <button
-                    key={p.value}
-                    onClick={() => setForm(f => ({ ...f, priority: p.value }))}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-label font-medium transition-all
-                      ${form.priority === p.value
-                        ? p.color + ' ring-2 ring-primary/40 scale-105'
-                        : 'bg-surface-container text-on-surface-variant'
-                      }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Expanded fields */}
+              {/* Detalhes opcionais — chips compactos + notas */}
               <AnimatePresence>
                 {expanded && (
                   <motion.div
@@ -182,145 +149,16 @@ export default function QuickCapture() {
                     transition={{ duration: 0.22 }}
                     className="overflow-hidden overflow-y-auto"
                   >
-                    <div className="px-5 pb-3 grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Projeto</label>
-                        <input
-                          className="input-field text-sm"
-                          placeholder="Ex: Trabalho"
-                          value={form.project}
-                          onChange={e => setForm(f => ({ ...f, project: e.target.value }))}
-                          maxLength={100}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Data de entrega</label>
-                        <input
-                          type="date"
-                          className="input-field text-sm"
-                          value={form.dueDate}
-                          onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Início</label>
-                        <input
-                          type="time"
-                          className="input-field text-sm"
-                          value={form.startTime}
-                          onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Término</label>
-                        <input
-                          type="time"
-                          className="input-field text-sm"
-                          value={form.dueTime}
-                          onChange={e => setForm(f => ({ ...f, dueTime: e.target.value }))}
-                        />
-                      </div>
-                      {form.dueDate && (
-                        <div className="flex flex-col gap-1 col-span-2">
-                          <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">
-                            <span className="material-symbols-outlined text-[12px] align-middle mr-0.5">notifications</span>
-                            Lembrete
-                          </label>
-                          <select
-                            className="input-field text-sm"
-                            value={form.reminderOffset ?? ''}
-                            onChange={e => setForm(f => ({ ...f, reminderOffset: e.target.value === '' ? null : Number(e.target.value) }))}
-                          >
-                            <option value="">Sem lembrete</option>
-                            {REMINDER_OPTIONS.map(opt => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                          {form.reminderOffset !== null && (form.startTime || form.dueTime) && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] font-label text-on-surface-variant/60">Em relação a:</span>
-                              <div className="flex gap-1">
-                                {[{ v: 'start', l: 'Início' }, { v: 'end', l: 'Término' }].map(o => (
-                                  <button
-                                    key={o.v}
-                                    type="button"
-                                    onClick={() => setForm(f => ({ ...f, reminderAnchor: o.v }))}
-                                    className={`px-2.5 py-1 rounded-full text-[11px] font-label font-medium transition-all
-                                      ${form.reminderAnchor === o.v
-                                        ? 'bg-primary text-white'
-                                        : 'bg-surface-container text-on-surface-variant'}`}
-                                  >
-                                    {o.l}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {form.dueDate && (
-                        <div className="flex flex-col gap-1 col-span-2">
-                          <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">
-                            <span className="material-symbols-outlined text-[12px] align-middle mr-0.5">repeat</span>
-                            Repetir
-                          </label>
-                          <select
-                            className="input-field text-sm"
-                            value={form.recurrence || 'none'}
-                            onChange={e => {
-                              const v = e.target.value
-                              setForm(f => ({
-                                ...f,
-                                recurrence: v,
-                                // Ao escolher 'custom' pela 1ª vez, sugere segunda a sexta.
-                                recurrenceDays: v === 'custom'
-                                  ? (Array.isArray(f.recurrenceDays) && f.recurrenceDays.length ? f.recurrenceDays : [1, 2, 3, 4, 5])
-                                  : f.recurrenceDays,
-                              }))
-                            }}
-                          >
-                            {RECURRENCE_OPTIONS.map(opt => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                          {form.recurrence === 'custom' && (
-                            <div className="mt-2">
-                              <div className="flex gap-1.5 flex-wrap">
-                                {DAYS_PT.map((d, i) => {
-                                  const sel = (form.recurrenceDays || []).includes(i)
-                                  return (
-                                    <button
-                                      key={i}
-                                      type="button"
-                                      onClick={() => toggleDay(i)}
-                                      className={`px-2.5 py-1.5 rounded-full text-xs font-label font-medium transition-all
-                                        ${sel
-                                          ? 'bg-primary text-white ring-2 ring-primary/40 scale-105'
-                                          : 'bg-surface-container text-on-surface-variant'}`}
-                                    >
-                                      {d}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                              {recurrenceInvalid && (
-                                <p className="text-[11px] text-error mt-1.5 font-label">Selecione ao menos um dia.</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className="flex flex-col gap-1 col-span-2">
-                        <label className="text-[10px] font-label text-on-surface-variant/60 uppercase tracking-wide">Notas</label>
-                        <textarea
-                          className="input-field text-sm resize-none"
-                          style={{ minHeight: '72px' }}
-                          placeholder="Detalhes adicionais..."
-                          value={form.notes}
-                          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                          maxLength={2000}
-                        />
-                      </div>
+                    <div className="px-5 pb-3 space-y-3">
+                      <MetaChips form={form} setForm={setForm} />
+                      <textarea
+                        className="input-field text-sm resize-none"
+                        style={{ minHeight: '64px' }}
+                        placeholder="Notas..."
+                        value={form.notes}
+                        onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                        maxLength={2000}
+                      />
                     </div>
                   </motion.div>
                 )}
@@ -349,9 +187,9 @@ export default function QuickCapture() {
                   </button>
                   <button
                     onClick={submit}
-                    disabled={!form.title.trim() || recurrenceInvalid}
+                    disabled={!form.title.trim() || invalid}
                     className={`btn-primary py-2.5 px-6 text-sm
-                      ${!form.title.trim() || recurrenceInvalid ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
+                      ${!form.title.trim() || invalid ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
                   >
                     Adicionar
                     <kbd className="ml-1 text-white/60 text-[10px] hidden md:inline">↵</kbd>

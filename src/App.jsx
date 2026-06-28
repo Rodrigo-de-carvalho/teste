@@ -8,6 +8,7 @@ const Dashboard    = lazy(() => import('./pages/Dashboard'))
 const Inbox        = lazy(() => import('./pages/Inbox'))
 const Planning     = lazy(() => import('./pages/Planning'))
 const Insights     = lazy(() => import('./pages/Insights'))
+const Notes        = lazy(() => import('./pages/Notes'))
 const Settings     = lazy(() => import('./pages/Settings'))
 const LoginPage    = lazy(() => import('./pages/LoginPage'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
@@ -23,7 +24,7 @@ import { registerSW } from './utils/swUpdate'
 import NotifHistoryPanel from './components/ui/NotifHistoryPanel'
 import { scheduleTaskNotification } from './utils/notifications'
 
-const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, settings: Settings }
+const PAGES = { dashboard: Dashboard, inbox: Inbox, planning: Planning, insights: Insights, notes: Notes, settings: Settings }
 
 // Fallback enquanto o chunk da página carrega
 function PageFallback() {

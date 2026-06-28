@@ -40,6 +40,12 @@ export const RECURRENCE_OPTIONS = [
   { value: 'custom',  label: 'Dias da semana' },
 ]
 
+// Recorrência 'custom' exige ao menos um dia da semana selecionado.
+export function recurrenceInvalid(form) {
+  return form?.recurrence === 'custom'
+    && (!Array.isArray(form.recurrenceDays) || form.recurrenceDays.length === 0)
+}
+
 export const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 export const DAYS_FULL_PT = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 export const MONTHS_PT = [

@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useStore from '../../store/useStore'
-import { REMINDER_OPTIONS } from '../../utils/notifications'
-import { RECURRENCE_OPTIONS, DAYS_PT } from '../../utils/dates'
 import { addTaskToCalendar } from '../../utils/calendar'
-
-const PRIORITIES = ['critical','high','medium','low']
-const PRIORITY_LABELS = { critical: '🔴 Crítico', high: '🟠 Alto', medium: '🔵 Médio', low: '⚪ Baixo' }
+import { PriorityFlag, MetaChips, AutoTextarea } from './TaskFields'
+import { recurrenceInvalid } from '../../utils/dates'
 
 export default function TaskDetailModal() {
   const { editingTask, setEditingTask, updateTask, deleteTask, completeTask, uncompleteTask, toggleSubtask } = useStore()
@@ -24,20 +21,10 @@ export default function TaskDetailModal() {
     }
   }, [editingTask])
 
-  // Recorrência 'custom' precisa de pelo menos um dia da semana selecionado.
-  const recurrenceInvalid = !!form && form.recurrence === 'custom'
-    && (!Array.isArray(form.recurrenceDays) || form.recurrenceDays.length === 0)
-
-  function toggleDay(d) {
-    setForm(f => {
-      const cur = Array.isArray(f.recurrenceDays) ? f.recurrenceDays : []
-      const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d].sort((a, b) => a - b)
-      return { ...f, recurrenceDays: next }
-    })
-  }
+  const invalid = recurrenceInvalid(form)
 
   function save() {
-    if (!form || !form.title.trim() || recurrenceInvalid) return
+    if (!form || !form.title.trim() || invalid) return
     updateTask(form.id, form)
     setEditingTask(null)
   }
@@ -246,21 +233,25 @@ export default function TaskDetailModal() {
             {/* Title */}
             <div>
               <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Título</label>
-              <input
-                className="input-forge text-lg font-semibold"
-                value={form.title}
-                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && save()}
-                placeholder="Nome da tarefa"
-                maxLength={200}
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  className="input-forge text-lg font-semibold flex-1"
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && save()}
+                  placeholder="Nome da tarefa"
+                  maxLength={200}
+                />
+                <PriorityFlag value={form.priority} onChange={(p) => setForm(f => ({ ...f, priority: p }))} />
+              </div>
             </div>
 
             {/* Notes */}
             <div>
               <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Notas</label>
-              <textarea
-                className="input-field resize-none h-24 text-sm"
+              <AutoTextarea
+                className="input-field text-sm"
+                minHeight={88}
                 value={form.notes}
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Adicione contexto, links, ideias..."
@@ -268,185 +259,27 @@ export default function TaskDetailModal() {
               />
             </div>
 
-            {/* Priority + Project */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Prioridade</label>
-                <select
-                  className="input-field text-sm"
-                  value={form.priority}
-                  onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
-                >
-                  {PRIORITIES.map(p => (
-                    <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Projeto</label>
-                <input
-                  className="input-field text-sm"
-                  value={form.project}
-                  onChange={e => setForm(f => ({ ...f, project: e.target.value }))}
-                  placeholder="Ex: Forge App"
-                  maxLength={100}
-                />
-              </div>
-            </div>
+            {/* Detalhes — chips compactos (data, horário, lembrete, repetir, projeto) */}
+            <MetaChips form={form} setForm={setForm} />
 
-            {/* Due date + horários */}
-            <div>
-              <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Data</label>
-              <input
-                type="date"
-                className="input-field text-sm"
-                value={form.dueDate || ''}
-                onChange={e => setForm(f => ({ ...f, dueDate: e.target.value || null }))}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Início</label>
-                <input
-                  type="time"
-                  className="input-field text-sm"
-                  value={form.startTime || ''}
-                  onChange={e => setForm(f => ({ ...f, startTime: e.target.value || null }))}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">Término</label>
-                <input
-                  type="time"
-                  className="input-field text-sm"
-                  value={form.dueTime || ''}
-                  onChange={e => setForm(f => ({ ...f, dueTime: e.target.value || null }))}
-                />
-              </div>
-            </div>
-            {/* Duração calculada */}
-            {form.startTime && form.dueTime && (() => {
-              const [sh, sm] = form.startTime.split(':').map(Number)
-              const [eh, em] = form.dueTime.split(':').map(Number)
-              const diff = (eh * 60 + em) - (sh * 60 + sm)
-              if (diff <= 0) return null
-              const h = Math.floor(diff / 60)
-              const m = diff % 60
-              return (
-                <p className="text-xs text-primary font-label flex items-center gap-1 -mt-2">
-                  <span className="material-symbols-outlined text-[13px]">schedule</span>
-                  Duração: {h > 0 ? `${h}h` : ''}{m > 0 ? ` ${m}min` : ''}
-                </p>
-              )
-            })()}
-
-            {/* Lembrete */}
-            {form.dueDate && (
-              <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">
-                  <span className="material-symbols-outlined text-[13px] align-middle mr-1" style={{ fontVariationSettings: "'FILL' 1" }}>notifications</span>
-                  Lembrete
-                </label>
-                <select
-                  className="input-field text-sm w-full"
-                  value={form.reminderOffset ?? ''}
-                  onChange={e => setForm(f => ({ ...f, reminderOffset: e.target.value === '' ? null : Number(e.target.value) }))}
-                >
-                  <option value="">Sem lembrete</option>
-                  {REMINDER_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                {form.reminderOffset !== null && (form.startTime || form.dueTime) && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-on-surface-variant">Em relação a:</span>
-                    <div className="flex gap-1.5">
-                      {[{ v: 'start', l: 'Início' }, { v: 'end', l: 'Término' }].map(o => (
-                        <button
-                          key={o.v}
-                          type="button"
-                          onClick={() => setForm(f => ({ ...f, reminderAnchor: o.v }))}
-                          className={`px-3 py-1 rounded-full text-xs font-label font-medium transition-all
-                            ${(form.reminderAnchor || 'start') === o.v
-                              ? 'bg-primary text-white'
-                              : 'bg-surface-container text-on-surface-variant'}`}
-                        >
-                          {o.l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => addTaskToCalendar(form)}
-                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-label font-medium
-                             text-on-surface-variant transition-colors hover:bg-secondary-container/40"
-                  style={{ border: '1px solid var(--clr-outline-var)' }}
-                >
-                  <span className="material-symbols-outlined text-[18px]">event</span>
-                  Adicionar ao calendário do celular
-                </button>
-              </div>
+            {form.recurrence && form.recurrence !== 'none' && (
+              <p className="text-[11px] text-on-surface-variant/60 -mt-3">
+                Ao concluir, uma nova tarefa é criada automaticamente para a próxima data.
+              </p>
             )}
 
-            {/* Recorrência */}
+            {/* Adicionar ao calendário do celular */}
             {form.dueDate && (
-              <div>
-                <label className="text-xs font-label text-on-surface-variant font-semibold tracking-wider uppercase mb-2 block">
-                  <span className="material-symbols-outlined text-[13px] align-middle mr-1">repeat</span>
-                  Repetir
-                </label>
-                <select
-                  className="input-field text-sm w-full"
-                  value={form.recurrence || 'none'}
-                  onChange={e => {
-                    const v = e.target.value
-                    setForm(f => ({
-                      ...f,
-                      recurrence: v,
-                      // Ao escolher 'custom' pela 1ª vez, sugere segunda a sexta.
-                      recurrenceDays: v === 'custom'
-                        ? (Array.isArray(f.recurrenceDays) && f.recurrenceDays.length ? f.recurrenceDays : [1, 2, 3, 4, 5])
-                        : f.recurrenceDays,
-                    }))
-                  }}
-                >
-                  {RECURRENCE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                {form.recurrence === 'custom' && (
-                  <div className="mt-2">
-                    <div className="flex gap-1.5 flex-wrap">
-                      {DAYS_PT.map((d, i) => {
-                        const sel = (form.recurrenceDays || []).includes(i)
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => toggleDay(i)}
-                            className={`px-2.5 py-1.5 rounded-full text-xs font-label font-medium transition-all
-                              ${sel
-                                ? 'bg-primary text-white ring-2 ring-primary/40 scale-105'
-                                : 'bg-surface-container text-on-surface-variant'}`}
-                          >
-                            {d}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {recurrenceInvalid && (
-                      <p className="text-[11px] text-error mt-1.5 font-label">Selecione ao menos um dia.</p>
-                    )}
-                  </div>
-                )}
-                {form.recurrence && form.recurrence !== 'none' && (
-                  <p className="text-[11px] text-on-surface-variant/60 mt-1.5">
-                    Ao concluir, uma nova tarefa é criada automaticamente para a próxima data.
-                  </p>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => addTaskToCalendar(form)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-label font-medium
+                           text-on-surface-variant transition-colors hover:bg-secondary-container/40"
+                style={{ border: '1px solid var(--clr-outline-var)' }}
+              >
+                <span className="material-symbols-outlined text-[18px]">event</span>
+                Adicionar ao calendário do celular
+              </button>
             )}
 
             {/* Subtasks */}
@@ -500,8 +333,8 @@ export default function TaskDetailModal() {
             <button onClick={() => setEditingTask(null)} className="btn-ghost flex-1 justify-center">Cancelar</button>
             <button
               onClick={save}
-              disabled={recurrenceInvalid}
-              className={`btn-primary flex-1 justify-center ${recurrenceInvalid ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
+              disabled={invalid}
+              className={`btn-primary flex-1 justify-center ${invalid ? 'opacity-40 cursor-not-allowed shadow-none' : ''}`}
             >
               Salvar
             </button>

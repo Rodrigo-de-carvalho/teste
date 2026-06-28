@@ -8,6 +8,7 @@ const NAV = [
   { id: 'inbox',     icon: 'inbox',             label: 'Entrada'      },
   { id: 'planning',  icon: 'calendar_month',    label: 'Planejamento' },
   { id: 'insights',  icon: 'query_stats',       label: 'Insights'     },
+  { id: 'notes',     icon: 'sticky_note_2',     label: 'Notas'        },
 ]
 
 export default function Sidebar() {

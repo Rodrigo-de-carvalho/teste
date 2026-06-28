@@ -36,6 +36,16 @@ create table if not exists public.tasks (
 -- alter table public.tasks add column if not exists client_id uuid;
 -- create unique index if not exists tasks_client_id_key on public.tasks (client_id);
 
+-- ── Bloco de notas livre (independente de tarefas) ───────────
+create table if not exists public.notes (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users(id) on delete cascade not null,
+  title      text,
+  body       text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- ── Tabela de subtarefas ─────────────────────────────────────
 create table if not exists public.subtasks (
   id      uuid primary key default gen_random_uuid(),
@@ -69,6 +79,13 @@ create table if not exists public.push_subscriptions (
 alter table public.tasks      enable row level security;
 alter table public.subtasks   enable row level security;
 alter table public.user_stats enable row level security;
+alter table public.notes      enable row level security;
+
+-- Notes: usuário só vê/edita as próprias
+drop policy if exists "notes_own" on public.notes;
+create policy "notes_own" on public.notes
+  for all using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- Tasks: usuário só vê/edita as próprias
 drop policy if exists "tasks_own" on public.tasks;
@@ -124,6 +141,11 @@ $$;
 drop trigger if exists tasks_updated_at on public.tasks;
 create trigger tasks_updated_at
   before update on public.tasks
+  for each row execute function public.set_updated_at();
+
+drop trigger if exists notes_updated_at on public.notes;
+create trigger notes_updated_at
+  before update on public.notes
   for each row execute function public.set_updated_at();
 
 -- ── Habilitar Realtime nas tabelas ────────────────────────────
