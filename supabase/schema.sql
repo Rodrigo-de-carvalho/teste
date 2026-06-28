@@ -201,19 +201,36 @@ as $$
 $$;
 
 -- ── Cron job: chama send-reminders a cada minuto ──────────────────────────────
--- Execute isso UMA VEZ no SQL Editor do Supabase:
+-- ATIVAÇÃO (executar UMA VEZ no SQL Editor do Supabase deste projeto).
+-- A versão antiga usava current_setting('app.supabase_url') / app.service_role_key,
+-- GUCs que NÃO existem por padrão (o agendamento falharia). Use a URL real do
+-- projeto e cole a service role key (Dashboard → Settings → API) no lugar indicado.
 --
+-- 1) Habilitar extensões necessárias:
+-- create extension if not exists pg_cron;
+-- create extension if not exists pg_net;
+--
+-- 2) Agendar (1×/min). Troque <SERVICE_ROLE_KEY> pela chave real do projeto:
 -- select cron.schedule(
 --   'forje-send-reminders',
 --   '* * * * *',
 --   $$
 --     select net.http_post(
---       url    := current_setting('app.supabase_url') || '/functions/v1/send-reminders',
+--       url     := 'https://<SEU_PROJECT_REF>.supabase.co/functions/v1/send-reminders',
 --       headers := jsonb_build_object(
 --         'Content-Type',  'application/json',
---         'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+--         'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
 --       ),
 --       body := '{}'::jsonb
 --     ) as request_id;
 --   $$
 -- );
+--
+-- 3) Verificar:
+-- select jobid, schedule, jobname, active from cron.job where jobname = 'forje-send-reminders';
+-- select status, return_message, start_time
+--   from cron.job_run_details
+--   where jobid = (select jobid from cron.job where jobname='forje-send-reminders')
+--   order by start_time desc limit 5;
+--
+-- Para reagendar/remover: select cron.unschedule('forje-send-reminders');
