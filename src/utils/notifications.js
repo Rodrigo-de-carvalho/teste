@@ -59,8 +59,10 @@ export async function subscribeAndSavePush(userId, accessToken, onStep, forceRef
     step = 'upsert'
     report('4/4 salvando no banco...')
     const json = sub.toJSON()
+    // on_conflict=endpoint: cada DISPOSITIVO tem sua linha. Antes o conflito era por
+    // user_id (PK) — registrar o push num segundo aparelho apagava o do primeiro.
     const res = await Promise.race([
-      fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions`, {
+      fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?on_conflict=endpoint`, {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -90,21 +92,11 @@ export async function subscribeAndSavePush(userId, accessToken, onStep, forceRef
 
 export async function sendTestNotification() {
   if (!notificationsSupported() || Notification.permission !== 'granted') return false
-  const sw = swController()
-  if (sw) {
-    sw.postMessage({
-      type: 'SHOW_NOTIFICATION',
-      title: '⏰ Forje — Teste',
-      body:  'As notificações estão funcionando corretamente!',
-      tag:   'forje-test-' + Date.now(),
-    })
-  } else {
-    new Notification('⏰ Forje — Teste', {
-      body: 'As notificações estão funcionando corretamente!',
-      icon: '/icon-192.png',
-    })
-  }
-  return true
+  return showBrowserNotification(
+    '⏰ Forje — Teste',
+    'As notificações estão funcionando corretamente!',
+    'forje-test-' + Date.now(),
+  )
 }
 
 const PRIORITY_LABEL = {
@@ -148,17 +140,37 @@ function swController() {
   return 'serviceWorker' in navigator ? navigator.serviceWorker.controller : null
 }
 
-function showBrowserNotification(title, body, tag) {
-  const sw = swController()
-  if (sw) {
-    // History gravado pelo broadcast que o SW envia de volta
-    sw.postMessage({ type: 'SHOW_NOTIFICATION', title, body, tag })
-  } else {
+function recordInHistory(tag, title, body) {
+  window.dispatchEvent(new CustomEvent('forje-notif-shown', {
+    detail: { taskId: tag, title, body, at: Date.now() }
+  }))
+}
+
+async function showBrowserNotification(title, body, tag) {
+  const opts = {
+    body, icon: '/icon-192.png', badge: '/icon-192.png',
+    tag, renotify: true, requireInteraction: true,
+    vibrate: [300, 100, 300, 100, 300],
+    data: { taskId: tag },
+  }
+  // Preferência: registration.showNotification — é o único caminho que funciona
+  // no Chrome Android (o construtor `new Notification()` LANÇA exceção lá).
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration()
+      if (reg?.showNotification) {
+        await reg.showNotification(title, opts)
+        recordInHistory(tag, title, body)
+        return true
+      }
+    }
+  } catch { /* tenta o fallback abaixo */ }
+  try {
     new Notification(title, { body, icon: '/icon-192.png', tag })
-    // Sem SW: dispara evento para o App registrar no histórico
-    window.dispatchEvent(new CustomEvent('forje-notif-shown', {
-      detail: { taskId: tag, title, body, at: Date.now() }
-    }))
+    recordInHistory(tag, title, body)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -182,8 +194,9 @@ function buildBody(task) {
   return priority
 }
 
-// Calcula o timestamp (ms) em que o lembrete deve disparar
-function calcReminderMs(task) {
+// Calcula o timestamp (ms) em que o lembrete deve disparar.
+// Exportado para a UI avisar quando o horário escolhido já passou.
+export function calcReminderMs(task) {
   if (!task.dueDate || task.reminderOffset == null) return null
   const time  = reminderAnchorTime(task)
   const dueMs = new Date(`${task.dueDate}T${time}`).getTime()
@@ -223,16 +236,19 @@ export function scheduleTaskNotification(task) {
   if (reminderMs <= now) return // muito antigo, ignora
 
   const delayMs = reminderMs - now
-  const sw = swController()
-  if (sw) {
-    sw.postMessage({ type: 'SCHEDULE_NOTIFICATION', id: task.id, delayMs, title, body })
-  } else {
-    const timerId = setTimeout(() => {
-      showBrowserNotification(title, body, task.id)
-      _timers.delete(task.id)
-    }, delayMs)
-    _timers.set(task.id, timerId)
-  }
+  // Timer SEMPRE na página, nunca via setTimeout dentro do Service Worker:
+  // o navegador mata SWs ociosos em segundos e os timers de lá quase nunca
+  // disparavam — principal causa de "a notificação não chegou" com o app aberto.
+  // O timer da página vive enquanto a aba/PWA existir, e o app reagenda tudo
+  // ao voltar ao primeiro plano (visibilitychange em App.jsx). Com o app
+  // fechado, quem cobre é o push do servidor (cron + send-reminders).
+  // setTimeout estoura com delays > ~24,8 dias — deixa para o reagendamento.
+  if (delayMs > 2_000_000_000) return
+  const timerId = setTimeout(() => {
+    showBrowserNotification(title, body, task.id)
+    _timers.delete(task.id)
+  }, delayMs)
+  _timers.set(task.id, timerId)
 }
 
 export function cancelTaskNotification(taskId) {
@@ -240,6 +256,7 @@ export function cancelTaskNotification(taskId) {
     window.Android?.cancelNotification?.(taskId)
     return
   }
+  // CANCEL para o SW cobre agendamentos feitos por versões antigas da página
   swController()?.postMessage({ type: 'CANCEL_NOTIFICATION', id: taskId })
   const timerId = _timers.get(taskId)
   if (timerId !== undefined) { clearTimeout(timerId); _timers.delete(taskId) }

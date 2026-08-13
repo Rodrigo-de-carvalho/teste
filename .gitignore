@@ -25,3 +25,7 @@ supabase/.temp
 *.njsproj
 *.sln
 *.sw?
+
+# Python (artefatos de outra branch)
+__pycache__/
+*.pyc

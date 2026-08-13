@@ -300,7 +300,7 @@ const useStore = create(
           }
 
           // Reagenda notificações — espera o SW estar ativo para usar canal seguro
-          const scheduleAll = () => tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} })
+          const scheduleAll = () => tasks.forEach(t => { try { scheduleTaskNotification(t) } catch { /* ignora */ } })
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.ready.then(scheduleAll).catch(scheduleAll)
           } else {
@@ -311,6 +311,10 @@ const useStore = create(
           if (notificationsSupported() && notificationPermission() === 'granted') {
             subscribeAndSavePush(expectedUid, session?.access_token).catch(() => {})
           }
+
+          // Ressuscita séries recorrentes cuja próxima ocorrência nunca foi criada
+          // (conclusão offline, falha de rede, versão antiga do app...)
+          if (!isOffline()) { try { get().healRecurringTasks() } catch { /* ignora */ } }
 
           if (stats?.lastActiveDate) {
             const yest = new Date(); yest.setDate(yest.getDate() - 1)
@@ -528,7 +532,7 @@ const useStore = create(
                 focusTaskId: s.focusTaskId === tempId ? real.id : s.focusTaskId,
               }
             })
-            if (!merged.completed) { try { scheduleTaskNotification(merged) } catch {} }
+            if (!merged.completed) { try { scheduleTaskNotification(merged) } catch { /* ignora */ } }
             return merged
           }
 
@@ -610,7 +614,7 @@ const useStore = create(
           }
 
           const updatedTask = get().tasks.find(t => t.id === id)
-          if (updatedTask) try { scheduleTaskNotification(updatedTask) } catch {}
+          if (updatedTask) try { scheduleTaskNotification(updatedTask) } catch { /* ignora */ }
         } catch (err) {
           if (import.meta.env.DEV) console.error('[Forje] updateTask failed:', err)
           // Offline: mantém a edição otimista (persistida localmente). Online: reverte e avisa.
@@ -887,9 +891,48 @@ const useStore = create(
                 focusTaskId: s.focusTaskId === t.id ? real.id : s.focusTaskId,
               }
             })
-            if (!real.completed) { try { scheduleTaskNotification(real) } catch {} }
+            if (!real.completed) { try { scheduleTaskNotification(real) } catch { /* ignora */ } }
           }
           // erro persistente: mantém _pendingSync (tenta de novo no próximo 'online')
+        }
+      },
+
+      // Repara séries recorrentes órfãs: uma tarefa com recorrência foi concluída,
+      // mas a próxima ocorrência não existe (a criação só acontecia online e, se o
+      // insert falhasse, a série morria em silêncio — ex.: um "Orar" diário que
+      // simplesmente parou de aparecer e de notificar). Roda no loadAll.
+      healRecurringTasks: () => {
+        const { tasks } = get()
+        const recurringDone = tasks.filter(t =>
+          t.completed && t.recurrence && t.recurrence !== 'none' && t.dueDate
+          && !String(t.id).startsWith('temp_')
+        )
+        const healed = new Set()
+        for (const t of recurringDone) {
+          const seriesKey = `${t.title}::${t.recurrence}`
+          if (healed.has(seriesKey)) continue
+          healed.add(seriesKey)
+
+          // A série ainda tem ocorrência aberta? Então está saudável.
+          const hasOpen = tasks.some(o =>
+            !o.completed && o.title === t.title && o.recurrence === t.recurrence
+          )
+          if (hasOpen) continue
+
+          // Recria a partir da ocorrência concluída mais recente da série
+          const latest = recurringDone
+            .filter(d => d.title === t.title && d.recurrence === t.recurrence)
+            .sort((a, b) => (b.dueDate || '').localeCompare(a.dueDate || ''))[0]
+          const nextDate = advanceDate(latest.dueDate, latest.recurrence, latest.recurrenceDays)
+          if (!nextDate) continue
+
+          get().addTask({
+            title: latest.title, notes: latest.notes, priority: latest.priority,
+            project: latest.project, dueDate: nextDate,
+            startTime: latest.startTime, dueTime: latest.dueTime,
+            reminderOffset: latest.reminderOffset, reminderAnchor: latest.reminderAnchor,
+            recurrence: latest.recurrence, recurrenceDays: latest.recurrenceDays,
+          }).catch(() => {})
         }
       },
 
@@ -899,7 +942,7 @@ const useStore = create(
         const xp    = tasks.filter(t => t.completed).reduce((sum, t) => sum + (XP_TABLE[t.priority] ?? 20), 0)
         const level = levelFromXp(xp)
         set(s => ({ user: { ...s.user, xp, level } }))
-        try { await supabase.from('user_stats').upsert({ id: authUser.id, xp, level }) } catch {}
+        try { await supabase.from('user_stats').upsert({ id: authUser.id, xp, level }) } catch { /* ignora */ }
         return { xp, level }
       },
 

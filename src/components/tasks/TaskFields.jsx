@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { REMINDER_OPTIONS } from '../../utils/notifications'
+import { REMINDER_OPTIONS, calcReminderMs } from '../../utils/notifications'
 import { RECURRENCE_OPTIONS, DAYS_PT, formatDate, recurrenceInvalid } from '../../utils/dates'
 
 // Controles compactos de tarefa, no estilo de gerenciadores como Todoist/TickTick:
@@ -151,6 +151,11 @@ export function MetaChips({ form, setForm }) {
   const panelCls = "mt-3 rounded-xl p-3 border border-outline-variant/40"
   const panelStyle = { background: 'var(--clr-surface-low)' }
 
+  // Lembrete configurado para um momento que já passou — não vai tocar.
+  // Antes era salvo em silêncio e o usuário achava que a notificação "falhou".
+  const fireMs = form.reminderOffset != null && form.dueDate ? calcReminderMs(form) : null
+  const reminderInPast = fireMs != null && fireMs <= Date.now()
+
   return (
     <div>
       <div className="flex flex-wrap gap-2">
@@ -188,6 +193,13 @@ export function MetaChips({ form, setForm }) {
           {form.project || 'Projeto'}
         </Chip>
       </div>
+
+      {reminderInPast && (
+        <p className="text-[11px] text-error font-label mt-2 flex items-center gap-1">
+          <span className="material-symbols-outlined text-[13px]">warning</span>
+          Esse horário já passou — o lembrete não será enviado. Ajuste a data ou o horário.
+        </p>
+      )}
 
       <AnimatePresence mode="wait">
         {open && (

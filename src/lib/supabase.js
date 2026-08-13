@@ -50,9 +50,10 @@ export function jsTaskToDb(data) {
   if (data.notes       !== undefined) db.notes        = data.notes
   if (data.priority    !== undefined) db.priority     = data.priority
   if (data.project     !== undefined) db.project      = data.project
-  if (data.dueDate        !== undefined) db.due_date        = data.dueDate
+  // '' → null: string vazia gravada no banco quebrava filtros e o cálculo de lembretes
+  if (data.dueDate        !== undefined) db.due_date        = data.dueDate || null
   if (data.startTime      !== undefined) db.start_time      = data.startTime || null
-  if (data.dueTime        !== undefined) db.due_time        = data.dueTime
+  if (data.dueTime        !== undefined) db.due_time        = data.dueTime || null
   if (data.reminderOffset !== undefined) db.reminder_offset = data.reminderOffset ?? null
   if (data.reminderAnchor !== undefined) db.reminder_anchor = data.reminderAnchor || 'start'
   if (data.recurrence     !== undefined) db.recurrence     = data.recurrence || 'none'

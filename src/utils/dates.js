@@ -7,12 +7,9 @@ export function localIso(date = new Date()) {
   ].join('-')
 }
 
-// Avança uma data "YYYY-MM-DD" conforme a recorrência. Retorna nova string ou null.
-// recurrenceDays: array de números 0-6 (Dom=0..Sáb=6), usado quando recurrence === 'custom'.
-export function advanceDate(iso, recurrence, recurrenceDays) {
-  if (!iso || !recurrence || recurrence === 'none') return null
-  const d = new Date(iso + 'T00:00:00')
-  if (recurrence === 'daily')   d.setDate(d.getDate() + 1)
+// Um passo de recorrência sobre um Date (mutação in-place). Retorna false se inválida.
+function stepDate(d, recurrence, recurrenceDays) {
+  if (recurrence === 'daily')        d.setDate(d.getDate() + 1)
   else if (recurrence === 'weekly')  d.setDate(d.getDate() + 7)
   else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
   else if (recurrence === 'custom') {
@@ -28,7 +25,26 @@ export function advanceDate(iso, recurrence, recurrenceDays) {
       }
     }
   }
-  else return null
+  else return false
+  return true
+}
+
+// Avança uma data "YYYY-MM-DD" conforme a recorrência. Retorna nova string ou null.
+// recurrenceDays: array de números 0-6 (Dom=0..Sáb=6), usado quando recurrence === 'custom'.
+// Catch-up: se a data estiver no passado (tarefa atrasada), avança quantos passos
+// forem necessários até hoje ou depois — antes, concluir uma diária vencida há um mês
+// criava a próxima ocorrência ainda no passado e a série ficava eternamente atrasada.
+export function advanceDate(iso, recurrence, recurrenceDays) {
+  if (!iso || !recurrence || recurrence === 'none') return null
+  const d = new Date(iso + 'T00:00:00')
+  if (isNaN(d.getTime())) return null
+  if (!stepDate(d, recurrence, recurrenceDays)) return null
+  const today = localIso()
+  let guard = 0
+  while (localIso(d) < today && guard < 400) {
+    if (!stepDate(d, recurrence, recurrenceDays)) return null
+    guard++
+  }
   return localIso(d)
 }
 

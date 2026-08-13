@@ -45,7 +45,7 @@ const pageVariants = {
 }
 
 export default function App() {
-  const { currentPage, setPage, initTheme, loadAll, setSession, applyRealtimeChange, authUser, addNotifToHistory } = useStore()
+  const { currentPage, setPage, initTheme, loadAll, setSession, applyRealtimeChange, authUser } = useStore()
   const realtimeRef = useRef(null)
   const [offline, setOffline] = useState(!navigator.onLine)
 
@@ -125,12 +125,9 @@ export default function App() {
     if (!authUser?.id) return
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
+      // Timers agora vivem na página — reagenda sempre, com ou sem Service Worker
       const { tasks } = useStore.getState()
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready
-          .then(() => tasks.forEach(t => { try { scheduleTaskNotification(t) } catch {} }))
-          .catch(() => {})
-      }
+      tasks.forEach(t => { try { scheduleTaskNotification(t) } catch { /* ignora */ } })
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)

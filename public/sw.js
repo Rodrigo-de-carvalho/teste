@@ -1,4 +1,4 @@
-const CACHE = 'forje-v9'
+const CACHE = 'forje-v10'
 const ASSETS_TO_CACHE = ['/']
 let focusTimerTimeout = null
 const scheduledNotifs = new Map() // taskId -> timeoutId
@@ -113,7 +113,7 @@ self.addEventListener('message', (event) => {
 // Recebe push do servidor (funciona com app FECHADO)
 self.addEventListener('push', (event) => {
   let data = {}
-  try { data = event.data?.json() ?? {} } catch {}
+  try { data = event.data?.json() ?? {} } catch { /* ignora */ }
   const { title = '⏰ Forje', body = '', tag = 'push-' + Date.now(), taskId } = data
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -133,10 +133,10 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       const existing = list.find(c => c.url.includes(self.location.origin))
       if (existing) return existing.focus()
-      return clients.openWindow('/')
+      return self.clients.openWindow('/')
     })
   )
 })
