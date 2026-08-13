@@ -67,13 +67,21 @@ create table if not exists public.user_stats (
 );
 
 -- ── Subscriptions de push (Web Push API) ────────────────────────────────────
+-- PK por ENDPOINT (um por dispositivo): cada aparelho do usuário recebe push.
+-- Antes o PK era user_id — logar num segundo dispositivo apagava o push do primeiro.
 create table if not exists public.push_subscriptions (
-  user_id    uuid primary key references auth.users(id) on delete cascade,
-  endpoint   text not null,
+  endpoint   text primary key,
+  user_id    uuid references auth.users(id) on delete cascade not null,
   p256dh     text not null,
   auth_key   text not null,
   updated_at timestamptz default now()
 );
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
+
+-- Migração para bancos existentes (execute UMA vez no SQL Editor):
+-- alter table public.push_subscriptions drop constraint push_subscriptions_pkey;
+-- alter table public.push_subscriptions add constraint push_subscriptions_pkey primary key (endpoint);
+-- create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
 
 -- ── Row Level Security ───────────────────────────────────────
 alter table public.tasks      enable row level security;
