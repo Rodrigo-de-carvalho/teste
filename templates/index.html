@@ -5,245 +5,557 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Gerenciador de Tarefas</title>
   <style>
+    :root {
+      --bg: #f3f4f8;
+      --surface: #ffffff;
+      --surface-2: #f9fafb;
+      --text: #16182d;
+      --text-muted: #6b7280;
+      --text-faint: #9ca3af;
+      --border: #e2e4ea;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-soft: #eef2ff;
+      --success: #10b981;
+      --success-hover: #059669;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --warn-soft: #fef3c7;
+      --warn-text: #92400e;
+      --info-soft: #dbeafe;
+      --info-text: #1e40af;
+      --done-soft: #d1fae5;
+      --done-text: #065f46;
+      --shadow: 0 1px 4px rgba(0,0,0,.07);
+      --shadow-hover: 0 4px 12px rgba(0,0,0,.10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111322;
+        --surface: #1b1e33;
+        --surface-2: #23263e;
+        --text: #e8e9f3;
+        --text-muted: #a3a8c3;
+        --text-faint: #6f7494;
+        --border: #2e3250;
+        --primary: #818cf8;
+        --primary-hover: #a5b0fc;
+        --primary-soft: #26295233;
+        --danger-soft: #45182080;
+        --warn-soft: #45330f80;
+        --warn-text: #fcd34d;
+        --info-soft: #16295480;
+        --info-text: #93c5fd;
+        --done-soft: #0c3b2d80;
+        --done-text: #6ee7b7;
+        --shadow: 0 1px 4px rgba(0,0,0,.4);
+        --shadow-hover: 0 4px 12px rgba(0,0,0,.5);
+      }
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f0f2f5;
-      color: #1a1a2e;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
     }
 
     header {
-      background: #4f46e5;
+      background: linear-gradient(120deg, #4f46e5, #7c3aed);
       color: white;
-      padding: 1.5rem 2rem;
+      padding: 1.25rem 1.5rem;
+    }
+    .header-inner {
+      max-width: 860px;
+      margin: 0 auto;
       display: flex;
       align-items: center;
       gap: 0.75rem;
-    }
-    header h1 { font-size: 1.5rem; font-weight: 700; }
-    header span { font-size: 1.6rem; }
-
-    main { max-width: 860px; margin: 2rem auto; padding: 0 1rem; }
-
-    /* Card nova tarefa */
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.08);
-      margin-bottom: 1.5rem;
-    }
-    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: #4f46e5; }
-
-    .form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-    .form-row input, .form-row textarea {
-      flex: 1;
-      padding: 0.6rem 0.9rem;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      outline: none;
-      transition: border-color .2s;
-    }
-    .form-row input:focus, .form-row textarea:focus { border-color: #4f46e5; }
-    textarea { resize: none; height: 42px; min-width: 200px; }
-
-    button.btn-add {
-      background: #4f46e5;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 0.6rem 1.4rem;
-      font-size: 0.95rem;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background .2s;
-      white-space: nowrap;
-    }
-    button.btn-add:hover { background: #4338ca; }
-
-    /* Filtros */
-    .filters {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
       flex-wrap: wrap;
     }
+    header h1 { font-size: 1.35rem; font-weight: 700; flex: 1; }
+    header .logo { font-size: 1.5rem; }
+    .header-stats { font-size: 0.85rem; opacity: .9; }
+
+    #notify-btn {
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.4);
+      color: white;
+      border-radius: 20px;
+      padding: 0.4rem 1rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #notify-btn:hover { background: rgba(255,255,255,.28); }
+    #notify-btn.hidden { display: none; }
+
+    main { max-width: 860px; margin: 1.5rem auto 3rem; padding: 0 1rem; }
+
+    /* Mensagens (flash) */
+    .flash {
+      border-radius: 10px;
+      padding: 0.7rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      animation: slide-in .25s ease;
+    }
+    .flash-success { background: var(--done-soft); color: var(--done-text); }
+    .flash-error   { background: var(--danger-soft); color: var(--danger); }
+    @keyframes slide-in { from { opacity: 0; transform: translateY(-6px); } }
+
+    .card {
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.25rem;
+    }
+    .card h2 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.9rem; color: var(--primary); }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+    .form-grid .full { grid-column: 1 / -1; }
+    @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
+
+    input[type="text"], textarea, input[type="datetime-local"], select {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+      background: var(--surface-2);
+      color: var(--text);
+      transition: border-color .2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 42px; }
+    label.field-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 9px;
+      padding: 0.6rem 1.3rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-ghost { background: transparent; color: var(--text-muted); }
+    .btn-ghost:hover { color: var(--text); }
+
+    /* Barra de busca + filtros */
+    .toolbar {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .toolbar form.search { flex: 1; min-width: 180px; display: flex; gap: 0.4rem; }
+    .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
     .filters a {
       text-decoration: none;
-      padding: 0.4rem 1rem;
+      padding: 0.38rem 0.85rem;
       border-radius: 20px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 500;
-      border: 1.5px solid #d1d5db;
-      color: #6b7280;
+      border: 1.5px solid var(--border);
+      color: var(--text-muted);
       transition: all .2s;
+      white-space: nowrap;
     }
-    .filters a:hover { border-color: #4f46e5; color: #4f46e5; }
-    .filters a.active { background: #4f46e5; color: white; border-color: #4f46e5; }
+    .filters a:hover { border-color: var(--primary); color: var(--primary); }
+    .filters a.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .filters a .count {
+      font-size: 0.72rem;
+      opacity: .75;
+      margin-left: 0.2rem;
+    }
 
     /* Lista de tarefas */
-    .task-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .task-list { display: flex; flex-direction: column; gap: 0.7rem; }
 
     .task {
-      background: white;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 0.9rem 1.1rem;
+      box-shadow: var(--shadow);
       display: flex;
-      align-items: center;
-      gap: 1rem;
+      align-items: flex-start;
+      gap: 0.8rem;
       transition: box-shadow .2s;
+      border-left: 4px solid transparent;
     }
-    .task:hover { box-shadow: 0 3px 10px rgba(0,0,0,.1); }
+    .task:hover { box-shadow: var(--shadow-hover); }
+    .task.prio-high   { border-left-color: #ef4444; }
+    .task.prio-medium { border-left-color: #f59e0b; }
+    .task.prio-low    { border-left-color: #94a3b8; }
+    .task.done { opacity: .62; }
+    .task.done .task-title { text-decoration: line-through; }
+    .task.overdue { border-left-color: var(--danger); }
+
+    .check-form { margin-top: 0.15rem; }
+    .check {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 0.8rem;
+      color: transparent;
+      transition: all .15s;
+      padding: 0;
+    }
+    .check:hover { border-color: var(--success); color: var(--success); }
+    .task.done .check { background: var(--success); border-color: var(--success); color: white; }
 
     .task-info { flex: 1; min-width: 0; }
-    .task-title {
-      font-weight: 600;
-      font-size: 0.97rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    .task-title { font-weight: 600; font-size: 0.95rem; overflow-wrap: anywhere; }
     .task-desc {
-      font-size: 0.82rem;
-      color: #6b7280;
+      font-size: 0.83rem;
+      color: var(--text-muted);
       margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      overflow-wrap: anywhere;
     }
-    .task-date {
-      font-size: 0.75rem;
-      color: #9ca3af;
-      margin-top: 3px;
+    .task-meta {
+      display: flex;
+      gap: 0.45rem;
+      margin-top: 0.45rem;
+      flex-wrap: wrap;
+      align-items: center;
     }
 
     .badge {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 600;
-      padding: 0.25rem 0.7rem;
+      padding: 0.2rem 0.6rem;
       border-radius: 20px;
       white-space: nowrap;
     }
-    .badge-pending    { background: #fef3c7; color: #92400e; }
-    .badge-in_progress { background: #dbeafe; color: #1e40af; }
-    .badge-done       { background: #d1fae5; color: #065f46; }
+    .badge-pending     { background: var(--warn-soft); color: var(--warn-text); }
+    .badge-in_progress { background: var(--info-soft); color: var(--info-text); }
+    .badge-done        { background: var(--done-soft); color: var(--done-text); }
+    .badge-due         { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+    .badge-due.today   { background: var(--warn-soft); color: var(--warn-text); border: none; }
+    .badge-due.overdue { background: var(--danger-soft); color: var(--danger); border: none; }
 
-    .task-actions { display: flex; gap: 0.4rem; align-items: center; }
-
+    .task-actions {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     select.status-select {
-      padding: 0.3rem 0.5rem;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 0.82rem;
+      width: auto;
+      padding: 0.3rem 0.45rem;
+      font-size: 0.8rem;
       cursor: pointer;
-      outline: none;
     }
-    button.btn-save {
-      background: #10b981;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 0.3rem 0.7rem;
-      font-size: 0.82rem;
+    .icon-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 7px;
+      width: 30px; height: 30px;
+      font-size: 0.85rem;
       cursor: pointer;
-      font-weight: 600;
+      display: grid;
+      place-items: center;
+      transition: all .15s;
+      padding: 0;
     }
-    button.btn-save:hover { background: #059669; }
-    button.btn-del {
-      background: #fee2e2;
-      color: #dc2626;
-      border: none;
-      border-radius: 6px;
-      padding: 0.3rem 0.6rem;
-      font-size: 0.82rem;
-      cursor: pointer;
-      font-weight: 700;
+    .icon-btn:hover { color: var(--primary); border-color: var(--primary); }
+    .icon-btn.del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+
+    @media (max-width: 560px) {
+      .task { flex-wrap: wrap; }
+      .task-actions { width: 100%; justify-content: flex-end; }
     }
-    button.btn-del:hover { background: #fca5a5; }
 
     .empty {
       text-align: center;
-      padding: 3rem;
-      color: #9ca3af;
+      padding: 3rem 1rem;
+      color: var(--text-faint);
       font-size: 0.95rem;
     }
     .empty span { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+
+    /* Modal de edição */
+    dialog {
+      border: none;
+      border-radius: 16px;
+      padding: 0;
+      width: min(480px, calc(100vw - 2rem));
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    .dialog-body { padding: 1.4rem; }
+    .dialog-body h3 { font-size: 1.05rem; margin-bottom: 1rem; color: var(--primary); }
+    .dialog-fields { display: flex; flex-direction: column; gap: 0.8rem; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.2rem; }
   </style>
 </head>
 <body>
 
 <header>
-  <span>✅</span>
-  <h1>Gerenciador de Tarefas</h1>
+  <div class="header-inner">
+    <span class="logo">✅</span>
+    <h1>Gerenciador de Tarefas</h1>
+    <span class="header-stats">
+      {{ counts.done }}/{{ counts.all }} concluídas
+    </span>
+    <button id="notify-btn" class="hidden" type="button">🔔 Ativar notificações</button>
+  </div>
 </header>
 
 <main>
 
-  <!-- Formulário nova tarefa -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Nova tarefa -->
   <div class="card">
     <h2>+ Nova Tarefa</h2>
     <form method="POST" action="/create">
-      <div class="form-row">
-        <input  type="text" name="title" placeholder="Título da tarefa" required />
-        <textarea name="description" placeholder="Descrição (opcional)"></textarea>
-        <button type="submit" class="btn-add">Adicionar</button>
+      <div class="form-grid">
+        <div class="full">
+          <input type="text" name="title" placeholder="O que precisa ser feito?" maxlength="200" required />
+        </div>
+        <div class="full">
+          <textarea name="description" placeholder="Descrição (opcional)" maxlength="2000" rows="2"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="due_date">Vencimento (para receber lembrete)</label>
+          <input type="datetime-local" id="due_date" name="due_date" />
+        </div>
+        <div>
+          <label class="field-label" for="priority">Prioridade</label>
+          <select id="priority" name="priority">
+            <option value="low">Baixa</option>
+            <option value="medium" selected>Média</option>
+            <option value="high">Alta</option>
+          </select>
+        </div>
+        <div class="full" style="text-align:right;">
+          <button type="submit" class="btn btn-primary">Adicionar</button>
+        </div>
       </div>
     </form>
   </div>
 
-  <!-- Filtros -->
-  <div class="filters">
-    <a href="/" class="{{ 'active' if not status_filter }}">Todas</a>
-    <a href="/?status=pending"     class="{{ 'active' if status_filter == 'pending' }}">Pendentes</a>
-    <a href="/?status=in_progress" class="{{ 'active' if status_filter == 'in_progress' }}">Em andamento</a>
-    <a href="/?status=done"        class="{{ 'active' if status_filter == 'done' }}">Concluídas</a>
+  <!-- Busca e filtros -->
+  <div class="toolbar">
+    <form class="search" method="GET" action="/">
+      {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+      <input type="text" name="q" placeholder="🔍 Buscar tarefas..." value="{{ search }}" />
+    </form>
+    <div class="filters">
+      <a href="/" class="{{ 'active' if not status_filter }}">Todas <span class="count">{{ counts.all }}</span></a>
+      <a href="/?status=pending" class="{{ 'active' if status_filter == 'pending' }}">Pendentes <span class="count">{{ counts.pending }}</span></a>
+      <a href="/?status=in_progress" class="{{ 'active' if status_filter == 'in_progress' }}">Em andamento <span class="count">{{ counts.in_progress }}</span></a>
+      <a href="/?status=done" class="{{ 'active' if status_filter == 'done' }}">Concluídas <span class="count">{{ counts.done }}</span></a>
+    </div>
   </div>
 
   <!-- Lista -->
   <div class="task-list">
     {% for task in tasks %}
-    <div class="task">
+    <div class="task prio-{{ task.priority }} {{ 'done' if task.status == 'done' }} {{ 'overdue' if task.is_overdue }}">
+
+      <form class="check-form" method="POST" action="/toggle/{{ task.id }}">
+        <button type="submit" class="check" title="{{ 'Reabrir' if task.status == 'done' else 'Concluir' }}">✓</button>
+      </form>
+
       <div class="task-info">
         <div class="task-title">{{ task.title }}</div>
         {% if task.description %}
         <div class="task-desc">{{ task.description }}</div>
         {% endif %}
-        <div class="task-date">{{ task.created_at }}</div>
+        <div class="task-meta">
+          <span class="badge badge-{{ task.status }}">
+            {% if task.status == 'pending' %}Pendente
+            {% elif task.status == 'in_progress' %}Em andamento
+            {% else %}Concluída{% endif %}
+          </span>
+          {% if task.due_display %}
+          <span class="badge badge-due {{ 'overdue' if task.is_overdue }} {{ 'today' if task.is_due_today }}">
+            {% if task.is_overdue %}⚠️ Venceu {{ task.due_display }}
+            {% elif task.is_due_today %}📅 Vence hoje, {{ task.due_display[11:] }}
+            {% else %}📅 {{ task.due_display }}{% endif %}
+          </span>
+          {% endif %}
+        </div>
       </div>
 
-      <span class="badge badge-{{ task.status }}">
-        {% if task.status == 'pending' %}Pendente
-        {% elif task.status == 'in_progress' %}Em andamento
-        {% else %}Concluída{% endif %}
-      </span>
-
       <div class="task-actions">
-        <form method="POST" action="/update/{{ task.id }}" style="display:flex;gap:0.4rem;">
-          <select name="status" class="status-select">
-            <option value="pending"     {% if task.status == 'pending' %}selected{% endif %}>Pendente</option>
+        <form method="POST" action="/update/{{ task.id }}">
+          <select name="status" class="status-select" title="Mudar status" onchange="this.form.submit()">
+            <option value="pending" {% if task.status == 'pending' %}selected{% endif %}>Pendente</option>
             <option value="in_progress" {% if task.status == 'in_progress' %}selected{% endif %}>Em andamento</option>
-            <option value="done"        {% if task.status == 'done' %}selected{% endif %}>Concluída</option>
+            <option value="done" {% if task.status == 'done' %}selected{% endif %}>Concluída</option>
           </select>
-          <button type="submit" class="btn-save">Salvar</button>
         </form>
-        <form method="POST" action="/delete/{{ task.id }}">
-          <button type="submit" class="btn-del" onclick="return confirm('Remover tarefa?')">✕</button>
+        <button type="button" class="icon-btn" title="Editar"
+                data-id="{{ task.id }}"
+                data-title="{{ task.title }}"
+                data-description="{{ task.description }}"
+                data-priority="{{ task.priority }}"
+                data-due="{{ task.due_date or '' }}"
+                onclick="openEdit(this)">✏️</button>
+        <form method="POST" action="/delete/{{ task.id }}"
+              onsubmit="return confirm('Remover a tarefa \x22{{ task.title|e }}\x22?')">
+          <button type="submit" class="icon-btn del" title="Excluir">✕</button>
         </form>
       </div>
     </div>
     {% else %}
     <div class="empty">
-      <span>📋</span>
-      Nenhuma tarefa encontrada.
+      <span>{{ '🔍' if search else '🎉' }}</span>
+      {% if search %}Nada encontrado para "{{ search }}".
+      {% elif status_filter %}Nenhuma tarefa neste filtro.
+      {% else %}Tudo em dia! Adicione sua primeira tarefa acima.{% endif %}
     </div>
     {% endfor %}
   </div>
 
 </main>
+
+<!-- Modal de edição -->
+<dialog id="edit-dialog">
+  <form method="POST" id="edit-form">
+    <div class="dialog-body">
+      <h3>Editar tarefa</h3>
+      <div class="dialog-fields">
+        <div>
+          <label class="field-label" for="edit-title">Título</label>
+          <input type="text" id="edit-title" name="title" maxlength="200" required />
+        </div>
+        <div>
+          <label class="field-label" for="edit-desc">Descrição</label>
+          <textarea id="edit-desc" name="description" maxlength="2000" rows="3"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="edit-due">Vencimento</label>
+          <input type="datetime-local" id="edit-due" name="due_date" />
+        </div>
+        <div>
+          <label class="field-label" for="edit-priority">Prioridade</label>
+          <select id="edit-priority" name="priority">
+            <option value="low">Baixa</option>
+            <option value="medium">Média</option>
+            <option value="high">Alta</option>
+          </select>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('edit-dialog').close()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  // ---------- Modal de edição ----------
+  function openEdit(btn) {
+    const dialog = document.getElementById('edit-dialog');
+    document.getElementById('edit-form').action = '/edit/' + btn.dataset.id;
+    document.getElementById('edit-title').value = btn.dataset.title;
+    document.getElementById('edit-desc').value = btn.dataset.description;
+    document.getElementById('edit-due').value = btn.dataset.due;
+    document.getElementById('edit-priority').value = btn.dataset.priority;
+    dialog.showModal();
+  }
+
+  // ---------- Mensagens somem sozinhas ----------
+  setTimeout(() => {
+    document.querySelectorAll('.flash').forEach(el => {
+      el.style.transition = 'opacity .4s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 400);
+    });
+  }, 4000);
+
+  // ---------- Notificações do navegador ----------
+  const notifyBtn = document.getElementById('notify-btn');
+
+  function updateNotifyButton() {
+    if (!('Notification' in window)) return;
+    notifyBtn.classList.toggle('hidden', Notification.permission !== 'default');
+  }
+
+  notifyBtn.addEventListener('click', async () => {
+    const permission = await Notification.requestPermission();
+    updateNotifyButton();
+    if (permission === 'granted') {
+      new Notification('Notificações ativadas! 🎉', {
+        body: 'Você será avisado quando uma tarefa vencer.',
+      });
+      checkReminders();
+    }
+  });
+
+  function alreadyNotified(task, kind) {
+    const key = `notified-${kind}-${task.id}-${task.due_date}`;
+    if (localStorage.getItem(key)) return true;
+    localStorage.setItem(key, '1');
+    return false;
+  }
+
+  async function checkReminders() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      const res = await fetch('/api/reminders');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      data.overdue.forEach(task => {
+        if (alreadyNotified(task, 'overdue')) return;
+        new Notification('⚠️ Tarefa vencida', {
+          body: `"${task.title}" venceu em ${task.due_display}.`,
+          tag: `overdue-${task.id}`,
+        });
+      });
+
+      data.due_today.forEach(task => {
+        if (alreadyNotified(task, 'today')) return;
+        new Notification('📅 Tarefa vence hoje', {
+          body: `"${task.title}" vence ${task.due_display}.`,
+          tag: `today-${task.id}`,
+        });
+      });
+    } catch (err) {
+      // Sem rede / servidor parado: tenta de novo no próximo ciclo.
+    }
+  }
+
+  updateNotifyButton();
+  checkReminders();
+  setInterval(checkReminders, 60 * 1000);
+</script>
 
 </body>
 </html>
